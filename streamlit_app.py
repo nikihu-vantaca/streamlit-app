@@ -358,7 +358,7 @@ def main():
             labels=["Copy-Pasted", "Other Evaluated"],
             values=[copy_paste, other_eval],
             hole=0.4,
-            marker_colors=["#6BB643", "#90ee90"]
+            marker_colors=["#6BB643", "#2176A5"]
         )])
         fig_cp.update_layout(title="% Copy-Pasted of Evaluated", height=350)
         st.plotly_chart(fig_cp, use_container_width=True)
