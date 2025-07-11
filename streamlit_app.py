@@ -142,14 +142,14 @@ def create_quality_bar_chart(df):
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'].astype(str),
+        x=df['date'],
         y=df['copy_paste_count'],
         name='Copy Paste',
         marker_color='#ff7f0e'
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'].astype(str),
+        x=df['date'],
         y=df['low_quality_count'],
         name='Low Quality',
         marker_color='#d62728'
@@ -160,13 +160,7 @@ def create_quality_bar_chart(df):
         xaxis_title='Date',
         yaxis_title='Count',
         barmode='group',
-        height=500,
-        xaxis=dict(
-            type='category',
-            tickmode='array',
-            tickvals=[str(d) for d in df['date']],
-            ticktext=[str(d) for d in df['date']]
-        )
+        height=500
     )
     
     return fig
@@ -177,14 +171,14 @@ def create_total_tickets_chart(df):
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'].astype(str),
+        x=df['date'],
         y=df['total_tickets'],
         name='Total Tickets',
         marker_color='#1f77b4'
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'].astype(str),
+        x=df['date'],
         y=df['total_evaluated'],
         name='Evaluated Tickets',
         marker_color='#2ca02c'
@@ -195,13 +189,7 @@ def create_total_tickets_chart(df):
         xaxis_title='Date',
         yaxis_title='Count',
         barmode='group',
-        height=500,
-        xaxis=dict(
-            type='category',
-            tickmode='array',
-            tickvals=[str(d) for d in df['date']],
-            ticktext=[str(d) for d in df['date']]
-        )
+        height=500
     )
     
     return fig
@@ -212,14 +200,14 @@ def create_skipped_management_chart(df):
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'].astype(str),
+        x=df['date'],
         y=df['skipped_count'],
         name='Skipped Tickets',
         marker_color='#9467bd'
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'].astype(str),
+        x=df['date'],
         y=df['management_company_ticket_count'],
         name='Management Company Tickets',
         marker_color='#8c564b'
@@ -230,13 +218,7 @@ def create_skipped_management_chart(df):
         xaxis_title='Date',
         yaxis_title='Count',
         barmode='group',
-        height=500,
-        xaxis=dict(
-            type='category',
-            tickmode='array',
-            tickvals=[str(d) for d in df['date']],
-            ticktext=[str(d) for d in df['date']]
-        )
+        height=500
     )
     
     return fig
