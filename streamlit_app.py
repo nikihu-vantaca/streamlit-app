@@ -323,9 +323,9 @@ def main():
     
     with col5:
         st.metric(
-            "Skipped Tickets",
+            "Missed Tickets",
             f"{metrics['total_skipped']:,}",
-            help="Skipped tickets due to service downtime"
+            help="Missed tickets due to service downtime"
         )
     
     with col6:
@@ -344,7 +344,7 @@ def main():
         mgt_company = metrics['total_management']
         other = metrics['total_tickets'] - (evaluated + skipped + mgt_company)
         fig_eval = go.Figure(data=[go.Pie(
-            labels=["Evaluated", "Skipped", "Management Company", "Other"],
+            labels=["Evaluated", "Missed", "Management Company", "Other"],
             values=[evaluated, skipped, mgt_company, other],
             hole=0.4,
             marker_colors=["#2ca02c", "#9467bd", "#8c564b", "#cccccc"]
