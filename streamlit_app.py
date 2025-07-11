@@ -15,7 +15,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
 st.markdown("""
 <style>
 .main-header {
@@ -40,7 +39,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=86400)  # Cache for 24 hours (daily refresh)
+@st.cache_data(ttl=3600)  # Cache for 1 hour for hourly refresh
 def fetch_langsmith_data(api_key, project_name="evaluators"):
     """Fetch and process LangSmith data for the past 2 weeks"""
     try:
@@ -275,13 +274,18 @@ def main():
     except KeyError:
         st.error("LangSmith API key not found in secrets. Please configure it in Streamlit Cloud.")
         st.stop()
-    st.markdown('<h1 class="main-header">🤖 Agent Performance Dashboard</h1>', unsafe_allow_html=True)
-    
-    # Add last updated timestamp
-    st.sidebar.markdown("---")
+    st.markdown('<h1 class="main-header">Zendesk Support Agent Performance Dashboard</h1>', unsafe_allow_html=True)
+
+    # --- Place your sidebar code here ---
+    if st.sidebar.button("🔄 Refresh Data Now"):
+        st.cache_data.clear()
+        st.rerun()
+        st.sidebar.success("Data refreshed!")
+
     st.sidebar.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    # Fetch data
+    # --- End sidebar code ---
+
+    # Now fetch data, etc.
     with st.spinner("Fetching data from LangSmith..."):
         df, daily_data = fetch_langsmith_data(api_key) # type: ignore
     
