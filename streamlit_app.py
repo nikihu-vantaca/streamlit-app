@@ -336,18 +336,20 @@ def main():
         )
     
     # Pie charts for evaluation and copy-paste rates
-    st.subheader("🥧 Evaluation & Copy-Paste Breakdown")
+    st.subheader("🥧 Evaluation & Quality Breakdown")
     pie1_col, pie2_col = st.columns(2)
     with pie1_col:
         evaluated = metrics['total_evaluated']
-        not_evaluated = metrics['total_tickets'] - metrics['total_evaluated']
+        skipped = metrics['total_skipped']
+        mgt_company = metrics['total_management']
+        other = metrics['total_tickets'] - (evaluated + skipped + mgt_company)
         fig_eval = go.Figure(data=[go.Pie(
-            labels=["Evaluated", "Not Evaluated"],
-            values=[evaluated, not_evaluated],
+            labels=["Evaluated", "Skipped", "Management Company", "Other"],
+            values=[evaluated, skipped, mgt_company, other],
             hole=0.4,
-            marker_colors=["#2ca02c", "#cccccc"]
+            marker_colors=["#2ca02c", "#9467bd", "#8c564b", "#cccccc"]
         )])
-        fig_eval.update_layout(title="% Evaluated vs Not Evaluated", height=350)
+        fig_eval.update_layout(title="% Ticket Outcomes", height=350)
         st.plotly_chart(fig_eval, use_container_width=True)
     with pie2_col:
         copy_paste = metrics['total_copy_paste']
