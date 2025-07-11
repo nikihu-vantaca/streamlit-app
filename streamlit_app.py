@@ -142,14 +142,14 @@ def create_quality_bar_chart(df):
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'],
+        x=df['date'].dt.strftime('%Y-%m-%d'),
         y=df['copy_paste_count'],
         name='Copy Paste',
         marker_color='#ff7f0e'
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'],
+        x=df['date'].dt.strftime('%Y-%m-%d'),
         y=df['low_quality_count'],
         name='Low Quality',
         marker_color='#d62728'
@@ -177,14 +177,14 @@ def create_total_tickets_chart(df):
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'],
+        x=df['date'].dt.strftime('%Y-%m-%d'),
         y=df['total_tickets'],
         name='Total Tickets',
         marker_color='#1f77b4'
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'],
+        x=df['date'].dt.strftime('%Y-%m-%d'),
         y=df['total_evaluated'],
         name='Evaluated Tickets',
         marker_color='#2ca02c'
@@ -212,14 +212,14 @@ def create_skipped_management_chart(df):
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'],
+        x=df['date'].dt.strftime('%Y-%m-%d'),
         y=df['skipped_count'],
         name='Skipped Tickets',
         marker_color='#9467bd'
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'],
+        x=df['date'].dt.strftime('%Y-%m-%d'),
         y=df['management_company_ticket_count'],
         name='Management Company Tickets',
         marker_color='#8c564b'
