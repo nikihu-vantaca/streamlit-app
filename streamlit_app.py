@@ -306,10 +306,10 @@ def main():
     
     with col2:
         st.metric(
-            "Evaluated Tickets",
-            f"{metrics['total_evaluated']:,}",
-            f"{metrics['evaluation_rate']:.1f}% of total",
-            help="Tickets that were successfully evaluated"
+            "Low Quality Responses",
+            f"{metrics['total_low_quality']:,}",
+            f"{metrics['low_quality_pct']:.1f}% of evaluated",
+            help="Tickets identified as low quality responses"
         )
     
     with col3:
@@ -327,11 +327,12 @@ def main():
 
     with col4:
         st.metric(
-            "Low Quality Responses",
-            f"{metrics['total_low_quality']:,}",
-            f"{metrics['low_quality_pct']:.1f}% of evaluated",
-            help="Tickets identified as low quality responses"
+            "Evaluated Tickets",
+            f"{metrics['total_evaluated']:,}",
+            f"{metrics['evaluation_rate']:.1f}% of total",
+            help="Tickets that were successfully evaluated"
         )
+        
     
     with col5:
         st.metric(
