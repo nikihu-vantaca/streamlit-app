@@ -9,7 +9,7 @@ import re
 
 # Page configuration
 st.set_page_config(
-    page_title="Agent Performance Dashboard",
+    page_title="Zendesk SupportAgent Performance Dashboard",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -161,10 +161,17 @@ def create_quality_bar_chart(df):
         xaxis_title='Date',
         yaxis_title='Count',
         barmode='group',
-        height=500
+        height=500,
+        xaxis=dict(
+            type='category',
+            tickmode='array',
+            tickvals=[d.strftime('%Y-%m-%d') for d in df['date']],
+            ticktext=[d.strftime('%Y-%m-%d') for d in df['date']]
+        )
     )
     
     return fig
+
 
 def create_total_tickets_chart(df):
     """Create bar chart for total evaluated vs total tickets"""
@@ -189,10 +196,17 @@ def create_total_tickets_chart(df):
         xaxis_title='Date',
         yaxis_title='Count',
         barmode='group',
-        height=500
+        height=500,
+        xaxis=dict(
+            type='category',
+            tickmode='array',
+            tickvals=[d.strftime('%Y-%m-%d') for d in df['date']],
+            ticktext=[d.strftime('%Y-%m-%d') for d in df['date']]
+        )
     )
     
     return fig
+
 
 def create_skipped_management_chart(df):
     """Create bar chart for skipped and management company tickets"""
@@ -217,7 +231,13 @@ def create_skipped_management_chart(df):
         xaxis_title='Date',
         yaxis_title='Count',
         barmode='group',
-        height=500
+        height=500,
+        xaxis=dict(
+            type='category',
+            tickmode='array',
+            tickvals=[d.strftime('%Y-%m-%d') for d in df['date']],
+            ticktext=[d.strftime('%Y-%m-%d') for d in df['date']]
+        )
     )
     
     return fig
@@ -275,7 +295,7 @@ def main():
     # Display summary metrics
     st.subheader("📊 2-Week Summary")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.metric(
@@ -294,54 +314,39 @@ def main():
     
     with col3:
         st.metric(
-            "Copy Paste Issues",
+            "Copy-Pasted Responses",
             f"{metrics['total_copy_paste']:,}",
             f"{metrics['copy_paste_pct']:.1f}% of evaluated",
             help="Tickets identified as copy-paste responses"
         )
     
+
+    
+    # Additional metrics row
+    col4, col5, col6 = st.columns(3)
+
     with col4:
         st.metric(
-            "Low Quality Issues",
+            "Low Quality Responses",
             f"{metrics['total_low_quality']:,}",
             f"{metrics['low_quality_pct']:.1f}% of evaluated",
             help="Tickets identified as low quality responses"
         )
     
-    # Additional metrics row
-    col5, col6, col7, col8 = st.columns(4)
-    
     with col5:
         st.metric(
             "Skipped Tickets",
             f"{metrics['total_skipped']:,}",
-            help="Tickets skipped due to empty bot answers"
+            help="Skipped tickets due to service downtime"
         )
     
     with col6:
         st.metric(
-            "Management Company",
+            "Management Company Tickets",
             f"{metrics['total_management']:,}",
-            help="Management company related tickets"
+            help="Skipped management company tickets"
         )
     
-    with col7:
-        quality_issues = metrics['total_copy_paste'] + metrics['total_low_quality']
-        quality_rate = (quality_issues / metrics['total_evaluated'] * 100) if metrics['total_evaluated'] > 0 else 0
-        st.metric(
-            "Overall Quality Issues",
-            f"{quality_issues:,}",
-            f"{quality_rate:.1f}% of evaluated",
-            help="Total copy-paste + low quality issues"
-        )
-    
-    with col8:
-        success_rate = 100 - quality_rate
-        st.metric(
-            "Success Rate",
-            f"{success_rate:.1f}%",
-            help="Percentage of tickets without quality issues"
-        )
     
     # Charts
     st.subheader("📈 Daily Trends")
