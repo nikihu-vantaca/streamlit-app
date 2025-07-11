@@ -250,32 +250,20 @@ def create_summary_metrics(df):
 
 # Main app
 def main():
+    try:
+        api_key = st.secrets["langsmith"]["api_key"]
+    except KeyError:
+        st.error("LangSmith API key not found in secrets. Please configure it in Streamlit Cloud.")
+        st.stop()
     st.markdown('<h1 class="main-header">🤖 Agent Performance Dashboard</h1>', unsafe_allow_html=True)
-    
-    # Sidebar for API key input
-    st.sidebar.markdown('<div class="sidebar-header">🔑 Configuration</div>', unsafe_allow_html=True)
-    
-    api_key = st.sidebar.text_input(
-        "LangSmith API Key",
-        type="password",
-        help="Enter your LangSmith API key"
-    )
-    
-    if st.sidebar.button("🔄 Refresh Data"):
-        st.cache_data.clear()
-        st.rerun()
     
     # Add last updated timestamp
     st.sidebar.markdown("---")
     st.sidebar.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    if not api_key:
-        st.warning("Please enter your LangSmith API key in the sidebar to get started.")
-        return
-    
     # Fetch data
     with st.spinner("Fetching data from LangSmith..."):
-        df, daily_data = fetch_langsmith_data(api_key)
+        df, daily_data = fetch_langsmith_data(api_key) # type: ignore
     
     if df is None:
         st.error("Failed to fetch data. Please check your API key and try again.")
