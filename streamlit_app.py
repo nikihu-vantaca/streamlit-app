@@ -344,10 +344,10 @@ def main():
         mgt_company = metrics['total_management']
         other = metrics['total_tickets'] - (evaluated + skipped + mgt_company)
         fig_eval = go.Figure(data=[go.Pie(
-            labels=["Evaluated", "Missed", "Management Company", "Other"],
-            values=[evaluated, skipped, mgt_company, other],
+            labels=["Evaluated", "Management Company", "Missed", "Other"],
+            values=[evaluated, mgt_company, skipped, other],
             hole=0.4,
-            marker_colors=["#2ecc71", "#e74c3c", "#f39c12", "#95a5a6"]
+            marker_colors=["#6BB643", "#2176A5", "#E4572E", "#D3D3D3"]
         )])
         fig_eval.update_layout(title="% Ticket Outcomes", height=350)
         st.plotly_chart(fig_eval, use_container_width=True)
