@@ -282,7 +282,9 @@ def main():
         st.rerun()
         st.sidebar.success("Data refreshed!")
 
-    st.sidebar.markdown(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    # Convert UTC to EDT (UTC-4)
+    edt_time = datetime.now() - timedelta(hours=4)
+    st.sidebar.markdown(f"**Last Updated (EDT):** {edt_time.strftime('%Y-%m-%d %H:%M:%S')}")
     # --- End sidebar code ---
 
     # Now fetch data, etc.
