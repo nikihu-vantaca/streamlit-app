@@ -145,14 +145,14 @@ def create_quality_bar_chart(df):
         x=df['date'],
         y=df['copy_paste_count'],
         name='Copy Paste',
-        marker_color='#ff7f0e'
+        marker_color='#2176A5'  # blue
     ))
     
     fig.add_trace(go.Bar(
         x=df['date'],
         y=df['low_quality_count'],
         name='Low Quality',
-        marker_color='#d62728'
+        marker_color='#6BB643'  # green
     ))
     
     fig.update_layout(
@@ -174,14 +174,14 @@ def create_total_tickets_chart(df):
         x=df['date'],
         y=df['total_tickets'],
         name='Total Tickets',
-        marker_color='#1f77b4'
+        marker_color='#2176A5'  # blue
     ))
     
     fig.add_trace(go.Bar(
         x=df['date'],
         y=df['total_evaluated'],
         name='Evaluated Tickets',
-        marker_color='#2ca02c'
+        marker_color='#6BB643'  # green
     ))
     
     fig.update_layout(
@@ -203,14 +203,14 @@ def create_skipped_management_chart(df):
         x=df['date'],
         y=df['skipped_count'],
         name='Skipped Tickets',
-        marker_color='#9467bd'
+        marker_color='#2176A5'  # blue
     ))
     
     fig.add_trace(go.Bar(
         x=df['date'],
         y=df['management_company_ticket_count'],
         name='Management Company Tickets',
-        marker_color='#8c564b'
+        marker_color='#6BB643'  # green
     ))
     
     fig.update_layout(
@@ -347,7 +347,7 @@ def main():
             labels=["Evaluated", "Missed", "Management Company", "Other"],
             values=[evaluated, skipped, mgt_company, other],
             hole=0.4,
-            marker_colors=["#2ca02c", "#9467bd", "#8c564b", "#cccccc"]
+            marker_colors=["#2ecc71", "#e74c3c", "#f39c12", "#95a5a6"]
         )])
         fig_eval.update_layout(title="% Ticket Outcomes", height=350)
         st.plotly_chart(fig_eval, use_container_width=True)
@@ -358,7 +358,7 @@ def main():
             labels=["Copy-Pasted", "Other Evaluated"],
             values=[copy_paste, other_eval],
             hole=0.4,
-            marker_colors=["#ff7f0e", "#2ca02c"]
+            marker_colors=["#228B22", "#90ee90"]
         )])
         fig_cp.update_layout(title="% Copy-Pasted of Evaluated", height=350)
         st.plotly_chart(fig_cp, use_container_width=True)
