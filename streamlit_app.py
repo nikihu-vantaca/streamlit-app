@@ -307,7 +307,6 @@ def main():
             f"{metrics['copy_paste_pct']:.1f}% of evaluated",
             help="Tickets identified as copy-paste responses"
         )
-    
 
     
     # Additional metrics row
@@ -335,6 +334,33 @@ def main():
             f"{metrics['total_management']:,}",
             help="Skipped management company tickets"
         )
+    
+    # Pie charts for evaluation and copy-paste rates
+    st.subheader("🥧 Evaluation & Copy-Paste Breakdown")
+    pie1_col, pie2_col = st.columns(2)
+    with pie1_col:
+        evaluated = metrics['total_evaluated']
+        not_evaluated = metrics['total_tickets'] - metrics['total_evaluated']
+        fig_eval = go.Figure(data=[go.Pie(
+            labels=["Evaluated", "Not Evaluated"],
+            values=[evaluated, not_evaluated],
+            hole=0.4,
+            marker_colors=["#2ca02c", "#cccccc"]
+        )])
+        fig_eval.update_layout(title="% Evaluated vs Not Evaluated", height=350)
+        st.plotly_chart(fig_eval, use_container_width=True)
+    with pie2_col:
+        copy_paste = metrics['total_copy_paste']
+        other_eval = metrics['total_evaluated'] - metrics['total_copy_paste']
+        fig_cp = go.Figure(data=[go.Pie(
+            labels=["Copy-Pasted", "Other Evaluated"],
+            values=[copy_paste, other_eval],
+            hole=0.4,
+            marker_colors=["#ff7f0e", "#2ca02c"]
+        )])
+        fig_cp.update_layout(title="% Copy-Pasted of Evaluated", height=350)
+        st.plotly_chart(fig_cp, use_container_width=True)
+
     
     
     # Charts
