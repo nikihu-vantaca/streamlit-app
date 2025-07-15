@@ -394,7 +394,7 @@ def main():
     # Export options
     st.subheader("💾 Export Data")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         csv_data = display_df.to_csv(index=False)
@@ -413,6 +413,31 @@ def main():
             file_name=f"agent_performance_{datetime.now().strftime('%Y%m%d')}.json",
             mime="application/json"
         )
+    
+    with col3:
+        low_quality_tickets = []
+        for date_str, day in daily_data.items():
+            if 'low_quality_tickets' in day:
+                for ticket in day['low_quality_tickets']:
+                    low_quality_tickets.append({
+                        'Date': date_str,
+                        'Ticket ID': ticket
+                    })
+        if low_quality_tickets:
+            import io
+            import csv
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=['Date', 'Ticket ID'])
+            writer.writeheader()
+            writer.writerows(low_quality_tickets)
+            st.download_button(
+                label="📥 Download Low Quality Tickets CSV",
+                data=output.getvalue(),
+                file_name=f"low_quality_tickets_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("No low quality tickets found for this period.")
 
 if __name__ == "__main__":
     main()
