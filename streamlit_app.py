@@ -65,7 +65,8 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
                 'management_company_ticket_count': 0,
                 'total_evaluated': 0,
                 'total_tickets': 0,
-                'experiment_name': f"zendesk-evaluation-{date_str}"
+                'experiment_name': f"zendesk-evaluation-{date_str}",
+                'low_quality_tickets': []  # <-- add this line
             }
             current_date += timedelta(days=1)
         
@@ -111,6 +112,17 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
                 
                 quality = result.get("quality")
                 comment = result.get("comment")
+                ticket_id = None
+                # Try to extract ticket_id from run.inputs or result
+                if hasattr(run, "inputs") and run.inputs:
+                    # Try nested dicts (common in LangSmith)
+                    if isinstance(run.inputs, dict):
+                        if 'ticket_id' in run.inputs:
+                            ticket_id = run.inputs['ticket_id']
+                        elif 'x' in run.inputs and isinstance(run.inputs['x'], dict):
+                            ticket_id = run.inputs['x'].get('ticket_id')
+                if ticket_id is None:
+                    ticket_id = result.get('ticket_id')
                 
                 if quality == "copy_paste":
                     daily_data[date_str]['copy_paste_count'] += 1
@@ -118,6 +130,8 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
                 elif quality == "low_quality":
                     daily_data[date_str]['low_quality_count'] += 1
                     daily_data[date_str]['total_evaluated'] += 1
+                    if ticket_id is not None:
+                        daily_data[date_str]['low_quality_tickets'].append(ticket_id)
                 elif comment == "empty_bot_answer":
                     daily_data[date_str]['skipped_count'] += 1
                 elif comment == "management_company_ticket":
