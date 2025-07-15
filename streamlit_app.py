@@ -66,7 +66,7 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
                 'total_evaluated': 0,
                 'total_tickets': 0,
                 'experiment_name': f"zendesk-evaluation-{date_str}",
-                'low_quality_tickets': []  # <-- add this line
+                'low_quality_tickets': []
             }
             current_date += timedelta(days=1)
         
@@ -113,14 +113,17 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
                 quality = result.get("quality")
                 comment = result.get("comment")
                 ticket_id = None
-                # Try to extract ticket_id from run.inputs or result
+                # Robust ticket_id extraction (matches test.py)
                 if hasattr(run, "inputs") and run.inputs:
-                    # Try nested dicts (common in LangSmith)
                     if isinstance(run.inputs, dict):
                         if 'ticket_id' in run.inputs:
                             ticket_id = run.inputs['ticket_id']
                         elif 'x' in run.inputs and isinstance(run.inputs['x'], dict):
                             ticket_id = run.inputs['x'].get('ticket_id')
+                        elif 'run' in run.inputs and isinstance(run.inputs['run'], dict):
+                            run_inputs = run.inputs['run'].get('inputs', {})
+                            if 'x' in run_inputs and isinstance(run_inputs['x'], dict):
+                                ticket_id = run_inputs['x'].get('ticket_id')
                 if ticket_id is None:
                     ticket_id = result.get('ticket_id')
                 
