@@ -229,7 +229,7 @@ def create_skipped_management_chart(df):
     fig.add_trace(go.Bar(
         x=df['date'],
         y=df['skipped_count'],
-        name='Skipped Tickets',
+        name='Missed Tickets',
         marker_color='#2176A5'  # blue
     ))
     
@@ -241,7 +241,7 @@ def create_skipped_management_chart(df):
     ))
     
     fig.update_layout(
-        title='Daily Skipped vs Management Company Tickets',
+        title='Daily Missed vs Management Company Tickets',
         xaxis_title='Date',
         yaxis_title='Count',
         barmode='group',
