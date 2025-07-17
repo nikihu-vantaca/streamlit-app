@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import json
 from langsmith import Client
 import re
+from collections import defaultdict
 
 # Page configuration
 st.set_page_config(
@@ -70,7 +71,8 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
             }
             current_date += timedelta(days=1)
         
-        # Process runs
+        # Step 1: Collect latest runs by (date, ticket_id)
+        latest_runs = {}  # key: (date_str, ticket_id), value: (start_time, run, result, quality, comment)
         for run in runs:
             # Extract experiment name and date
             experiment = None
@@ -95,8 +97,8 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
             if date_str not in daily_data:
                 continue
             
-            # Process detailed_similarity_evaluator runs
-            if run.name == "detailed_similarity_evaluator" and run.outputs:
+            # Only process detailed_similarity_evaluator runs
+            if getattr(run, "name", None) == "detailed_similarity_evaluator" and getattr(run, "outputs", None):
                 output = run.outputs
                 if isinstance(output, dict):
                     result = output
@@ -107,13 +109,11 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
                         continue
                 else:
                     continue
-                
-                daily_data[date_str]['total_tickets'] += 1
-                
+                # Only proceed if result is set
                 quality = result.get("quality")
                 comment = result.get("comment")
-                ticket_id = None
                 # Robust ticket_id extraction (matches test.py)
+                ticket_id = None
                 if hasattr(run, "inputs") and run.inputs:
                     if isinstance(run.inputs, dict):
                         if 'ticket_id' in run.inputs:
@@ -126,22 +126,32 @@ def fetch_langsmith_data(api_key, project_name="evaluators"):
                                 ticket_id = run_inputs['x'].get('ticket_id')
                 if ticket_id is None:
                     ticket_id = result.get('ticket_id')
-                
-                if quality == "copy_paste":
-                    daily_data[date_str]['copy_paste_count'] += 1
-                    daily_data[date_str]['total_evaluated'] += 1
-                elif quality == "low_quality":
-                    daily_data[date_str]['low_quality_count'] += 1
-                    daily_data[date_str]['total_evaluated'] += 1
-                    if ticket_id is not None:
-                        daily_data[date_str]['low_quality_tickets'].append(ticket_id)
-                elif comment == "empty_bot_answer":
-                    daily_data[date_str]['skipped_count'] += 1
-                elif comment == "management_company_ticket":
-                    daily_data[date_str]['management_company_ticket_count'] += 1
+                # Extract start_time
+                start_time = getattr(run, "start_time", None)
+                if isinstance(start_time, str):
+                    start_time_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
                 else:
-                    # Other evaluated tickets
-                    daily_data[date_str]['total_evaluated'] += 1
+                    start_time_dt = start_time  # If already a datetime
+                key = (date_str, ticket_id)
+                # Only keep the latest run for each (date, ticket_id)
+                if ticket_id is not None and (key not in latest_runs or start_time_dt > latest_runs[key][0]):
+                    latest_runs[key] = (start_time_dt, run, result, quality, comment)
+        # Step 2: Process only the latest runs
+        for (date_str, ticket_id), (start_time_dt, run, result, quality, comment) in latest_runs.items():
+            daily_data[date_str]['total_tickets'] += 1
+            if quality == "copy_paste":
+                daily_data[date_str]['copy_paste_count'] += 1
+                daily_data[date_str]['total_evaluated'] += 1
+            elif quality == "low_quality":
+                daily_data[date_str]['low_quality_count'] += 1
+                daily_data[date_str]['total_evaluated'] += 1
+                daily_data[date_str]['low_quality_tickets'].append(ticket_id)
+            elif comment == "empty_bot_answer":
+                daily_data[date_str]['skipped_count'] += 1
+            elif comment == "management_company_ticket":
+                daily_data[date_str]['management_company_ticket_count'] += 1
+            else:
+                daily_data[date_str]['total_evaluated'] += 1
         
         # Convert to DataFrame
         df = pd.DataFrame(list(daily_data.values()))
