@@ -163,7 +163,7 @@ class TicketDatabase:
         elif date_range == "4_weeks":
             start_date = end_date - timedelta(days=28)
         else:  # all_data
-            start_date = datetime(2020, 1, 1)
+            start_date = datetime(2025, 7, 1)  # Start from July 1, 2025
         
         start_date_str = start_date.strftime("%Y-%m-%d")
         end_date_str = end_date.strftime("%Y-%m-%d")
@@ -239,7 +239,7 @@ class TicketDatabase:
         elif date_range == "4_weeks":
             start_date = end_date - timedelta(days=28)
         else:  # all_data
-            start_date = datetime(2020, 1, 1)
+            start_date = datetime(2025, 7, 1)  # Start from July 1, 2025
         
         start_date_str = start_date.strftime("%Y-%m-%d")
         end_date_str = end_date.strftime("%Y-%m-%d")
