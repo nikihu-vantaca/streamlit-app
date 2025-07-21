@@ -358,7 +358,14 @@ def main():
             output = io.StringIO()
             writer = csv.DictWriter(output, fieldnames=['Date', 'Ticket ID'])
             writer.writeheader()
-            writer.writerows(low_quality_tickets)
+            # Convert database field names to CSV field names
+            formatted_tickets = []
+            for ticket in low_quality_tickets:
+                formatted_tickets.append({
+                    'Date': ticket['date'],
+                    'Ticket ID': ticket['ticket_id']
+                })
+            writer.writerows(formatted_tickets)
             st.download_button(
                 label="📥 Download Low Quality Tickets CSV",
                 data=output.getvalue(),
