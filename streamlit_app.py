@@ -7,6 +7,7 @@ import json
 from langsmith import Client
 import re
 from collections import defaultdict
+from database import TicketDatabase
 
 # Page configuration
 st.set_page_config(
@@ -40,129 +41,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour for hourly refresh
-def fetch_langsmith_data(api_key, project_name="evaluators"):
-    """Fetch and process LangSmith data for the past 2 weeks"""
-    try:
-        client = Client(api_key=api_key)
-        runs = client.list_runs(project_name=project_name)
-        
-        # Generate date range for past 2 weeks
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=14)
-        
-        # Initialize data structure
-        daily_data = {}
-        
-        # Create entries for all dates in range (fill with 0s for missing days)
-        current_date = start_date
-        while current_date <= end_date:
-            date_str = current_date.strftime("%Y-%m-%d")
-            daily_data[date_str] = {
-                'date': date_str,
-                'copy_paste_count': 0,
-                'low_quality_count': 0,
-                'skipped_count': 0,
-                'management_company_ticket_count': 0,
-                'total_evaluated': 0,
-                'total_tickets': 0,
-                'experiment_name': f"zendesk-evaluation-{date_str}",
-                'low_quality_tickets': []
-            }
-            current_date += timedelta(days=1)
-        
-        # Step 1: Collect latest runs by (date, ticket_id)
-        latest_runs = {}  # key: (date_str, ticket_id), value: (start_time, run, result, quality, comment)
-        for run in runs:
-            # Extract experiment name and date
-            experiment = None
-            if hasattr(run, "metadata") and run.metadata and isinstance(run.metadata, dict):
-                experiment = run.metadata.get("experiment")
-            
-            if not experiment:
-                continue
-                
-            # Check if it's a zendesk evaluation experiment
-            if not experiment.startswith("zendesk-evaluation-2025-07-"):
-                continue
-                
-            # Extract date from experiment name
-            date_match = re.search(r"zendesk-evaluation-(\d{4}-\d{2}-\d{2})", experiment)
-            if not date_match:
-                continue
-                
-            date_str = date_match.group(1)
-            
-            # Skip if date is outside our range
-            if date_str not in daily_data:
-                continue
-            
-            # Only process detailed_similarity_evaluator runs
-            if getattr(run, "name", None) == "detailed_similarity_evaluator" and getattr(run, "outputs", None):
-                output = run.outputs
-                if isinstance(output, dict):
-                    result = output
-                elif isinstance(output, str):
-                    try:
-                        result = json.loads(output)
-                    except Exception:
-                        continue
-                else:
-                    continue
-                # Only proceed if result is set
-                quality = result.get("quality")
-                comment = result.get("comment")
-                # Robust ticket_id extraction (matches test.py)
-                ticket_id = None
-                if hasattr(run, "inputs") and run.inputs:
-                    if isinstance(run.inputs, dict):
-                        if 'ticket_id' in run.inputs:
-                            ticket_id = run.inputs['ticket_id']
-                        elif 'x' in run.inputs and isinstance(run.inputs['x'], dict):
-                            ticket_id = run.inputs['x'].get('ticket_id')
-                        elif 'run' in run.inputs and isinstance(run.inputs['run'], dict):
-                            run_inputs = run.inputs['run'].get('inputs', {})
-                            if 'x' in run_inputs and isinstance(run_inputs['x'], dict):
-                                ticket_id = run_inputs['x'].get('ticket_id')
-                if ticket_id is None:
-                    ticket_id = result.get('ticket_id')
-                # Extract start_time
-                start_time = getattr(run, "start_time", None)
-                if isinstance(start_time, str):
-                    start_time_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-                else:
-                    start_time_dt = start_time  # If already a datetime
-                key = (date_str, ticket_id)
-                # Only keep the latest run for each (date, ticket_id)
-                if ticket_id is not None and (key not in latest_runs or start_time_dt > latest_runs[key][0]):
-                    latest_runs[key] = (start_time_dt, run, result, quality, comment)
-        # Step 2: Process only the latest runs
-        for (date_str, ticket_id), (start_time_dt, run, result, quality, comment) in latest_runs.items():
-            daily_data[date_str]['total_tickets'] += 1
-            if quality == "copy_paste":
-                daily_data[date_str]['copy_paste_count'] += 1
-                daily_data[date_str]['total_evaluated'] += 1
-            elif quality == "low_quality":
-                daily_data[date_str]['low_quality_count'] += 1
-                daily_data[date_str]['total_evaluated'] += 1
-                daily_data[date_str]['low_quality_tickets'].append(ticket_id)
-            elif comment == "empty_bot_answer":
-                daily_data[date_str]['skipped_count'] += 1
-            elif comment == "management_company_ticket":
-                daily_data[date_str]['management_company_ticket_count'] += 1
-            else:
-                daily_data[date_str]['total_evaluated'] += 1
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(list(daily_data.values()))
-        df['date'] = pd.to_datetime(df['date'])
-        df = df.sort_values('date')
-        
-        return df, daily_data
-        
-    except Exception as e:
-        st.error(f"Error fetching data: {str(e)}")
-        return None, None
+# Initialize database
+@st.cache_resource
+def get_database():
+    return TicketDatabase()
 
 def create_quality_bar_chart(df):
     """Create bar chart for copy_paste and low_quality counts"""
@@ -229,7 +111,7 @@ def create_skipped_management_chart(df):
     fig.add_trace(go.Bar(
         x=df['date'],
         y=df['skipped_count'],
-        name='Missed Tickets',
+        name='Skipped Tickets',
         marker_color='#2176A5'  # blue
     ))
     
@@ -241,7 +123,7 @@ def create_skipped_management_chart(df):
     ))
     
     fig.update_layout(
-        title='Daily Missed vs Management Company Tickets',
+        title='Daily Skipped vs Management Company Tickets',
         xaxis_title='Date',
         yaxis_title='Count',
         barmode='group',
@@ -283,32 +165,59 @@ def main():
     except KeyError:
         st.error("LangSmith API key not found in secrets. Please configure it in Streamlit Cloud.")
         st.stop()
+    
     st.markdown('<h1 class="main-header">Zendesk Support Agent Performance Dashboard</h1>', unsafe_allow_html=True)
 
-    # --- Place your sidebar code here ---
-    if st.sidebar.button("🔄 Refresh Data Now"):
-        st.cache_data.clear()
+    # Initialize database
+    db = get_database()
+
+    # Sidebar controls
+    st.sidebar.markdown("### 🔄 Data Management")
+    
+    # Sync button to fetch latest data
+    if st.sidebar.button("🔄 Sync Latest Data"):
+        with st.spinner("Syncing latest data from LangSmith..."):
+            new_records = db.fetch_and_store_latest_data(api_key)
+            if new_records > 0:
+                st.sidebar.success(f"✅ Synced {new_records} new records!")
+            else:
+                st.sidebar.info("✅ Database is up to date!")
         st.rerun()
-        st.sidebar.success("Data refreshed!")
 
     # Convert UTC to EDT (UTC-4)
     edt_time = datetime.now() - timedelta(hours=4)
     st.sidebar.markdown(f"**Last Updated (EDT):** {edt_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    # --- End sidebar code ---
 
-    # Now fetch data, etc.
-    with st.spinner("Fetching data from LangSmith..."):
-        df, daily_data = fetch_langsmith_data(api_key) # type: ignore
+    # Date range selection
+    date_range_options = ["2 Weeks", "4 Weeks", "All Data"]
+    selected_date_range = st.sidebar.radio(
+        "Select Date Range for Data:",
+        date_range_options,
+        index=0,
+        help="Choose how far back to fetch data for analysis."
+    )
+
+    # Map user-friendly options to function parameters
+    if selected_date_range == "2 Weeks":
+        date_range_param = "2_weeks"
+    elif selected_date_range == "4 Weeks":
+        date_range_param = "4_weeks"
+    else: # All Data
+        date_range_param = "all_data"
+
+    # Get data from database
+    with st.spinner("Loading data from database..."):
+        df, daily_data = db.get_data_for_range(date_range_param)
     
-    if df is None:
-        st.error("Failed to fetch data. Please check your API key and try again.")
+    if df is None or df.empty:
+        st.warning("No data found for the selected date range. Try syncing data first!")
         return
     
     # Create summary metrics
     metrics = create_summary_metrics(df)
     
     # Display summary metrics
-    st.subheader("📊 2-Week Summary")
+    st.subheader("📊 Summary")
     
     col1, col2, col3 = st.columns(3)
     
@@ -442,14 +351,7 @@ def main():
         )
     
     with col3:
-        low_quality_tickets = []
-        for date_str, day in daily_data.items():
-            if 'low_quality_tickets' in day:
-                for ticket in day['low_quality_tickets']:
-                    low_quality_tickets.append({
-                        'Date': date_str,
-                        'Ticket ID': ticket
-                    })
+        low_quality_tickets = db.get_low_quality_tickets(date_range_param)
         if low_quality_tickets:
             import io
             import csv

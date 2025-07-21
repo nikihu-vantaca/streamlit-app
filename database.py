@@ -1,0 +1,257 @@
+import sqlite3
+import pandas as pd
+from datetime import datetime, timedelta
+import json
+from langsmith import Client
+import re
+from collections import defaultdict
+
+class TicketDatabase:
+    def __init__(self, db_path='ticket_data.db'):
+        self.db_path = db_path
+        self.init_database()
+    
+    def init_database(self):
+        """Initialize the database with required tables"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Create main table for ticket evaluations
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ticket_evaluations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                ticket_id INTEGER NOT NULL,
+                quality TEXT,
+                comment TEXT,
+                experiment_name TEXT,
+                start_time TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(date, ticket_id)
+            )
+        ''')
+        
+        # Create index for faster queries
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_date_ticket 
+            ON ticket_evaluations(date, ticket_id)
+        ''')
+        
+        conn.commit()
+        conn.close()
+    
+    def fetch_and_store_latest_data(self, api_key, project_name="evaluators"):
+        """Fetch latest data from LangSmith and store in database"""
+        try:
+            client = Client(api_key=api_key)
+            runs = client.list_runs(project_name=project_name)
+            
+            # Get the latest timestamp we have in our database
+            latest_timestamp = self.get_latest_timestamp()
+            
+            # Collect latest runs by (date, ticket_id)
+            latest_runs = {}
+            
+            for run in runs:
+                # Extract experiment name and date
+                experiment = None
+                if hasattr(run, "metadata") and run.metadata and isinstance(run.metadata, dict):
+                    experiment = run.metadata.get("experiment")
+                
+                if not experiment:
+                    continue
+                    
+                # Check if it's a zendesk evaluation experiment
+                if not experiment.startswith("zendesk-evaluation-2025-07-"):
+                    continue
+                    
+                # Extract date from experiment name
+                date_match = re.search(r"zendesk-evaluation-(\d{4}-\d{2}-\d{2})", experiment)
+                if not date_match:
+                    continue
+                    
+                date_str = date_match.group(1)
+                
+                # Only process detailed_similarity_evaluator runs
+                if getattr(run, "name", None) == "detailed_similarity_evaluator" and getattr(run, "outputs", None):
+                    output = run.outputs
+                    if isinstance(output, dict):
+                        result = output
+                    elif isinstance(output, str):
+                        try:
+                            result = json.loads(output)
+                        except Exception:
+                            continue
+                    else:
+                        continue
+                    
+                    quality = result.get("quality")
+                    comment = result.get("comment")
+                    
+                    # Extract ticket_id
+                    ticket_id = None
+                    if hasattr(run, "inputs") and run.inputs:
+                        if isinstance(run.inputs, dict):
+                            if 'ticket_id' in run.inputs:
+                                ticket_id = run.inputs['ticket_id']
+                            elif 'x' in run.inputs and isinstance(run.inputs['x'], dict):
+                                ticket_id = run.inputs['x'].get('ticket_id')
+                            elif 'run' in run.inputs and isinstance(run.inputs['run'], dict):
+                                run_inputs = run.inputs['run'].get('inputs', {})
+                                if 'x' in run_inputs and isinstance(run_inputs['x'], dict):
+                                    ticket_id = run_inputs['x'].get('ticket_id')
+                    if ticket_id is None:
+                        ticket_id = result.get('ticket_id')
+                    
+                    # Extract start_time
+                    start_time = getattr(run, "start_time", None)
+                    if isinstance(start_time, str):
+                        start_time_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+                    else:
+                        start_time_dt = start_time
+                    
+                    # Check if this run is newer than what we have
+                    if start_time_dt and latest_timestamp and start_time_dt <= latest_timestamp:
+                        continue
+                    
+                    key = (date_str, ticket_id)
+                    if ticket_id is not None and (key not in latest_runs or start_time_dt > latest_runs[key][0]):
+                        latest_runs[key] = (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time)
+            
+            # Store new/updated data
+            if latest_runs:
+                self.store_evaluations(latest_runs)
+                return len(latest_runs)
+            return 0
+            
+        except Exception as e:
+            print(f"Error fetching data: {str(e)}")
+            return 0
+    
+    def get_latest_timestamp(self):
+        """Get the latest start_time from the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT MAX(start_time) FROM ticket_evaluations')
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result[0]:
+            return datetime.fromisoformat(result[0].replace("Z", "+00:00"))
+        return None
+    
+    def store_evaluations(self, evaluations):
+        """Store evaluation data in the database"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        for (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time) in evaluations.values():
+            cursor.execute('''
+                INSERT OR REPLACE INTO ticket_evaluations 
+                (date, ticket_id, quality, comment, experiment_name, start_time)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (date_str, ticket_id, quality, comment, experiment, start_time))
+        
+        conn.commit()
+        conn.close()
+    
+    def get_data_for_range(self, date_range="2_weeks"):
+        """Get data for the specified date range"""
+        end_date = datetime.now()
+        if date_range == "2_weeks":
+            start_date = end_date - timedelta(days=14)
+        elif date_range == "4_weeks":
+            start_date = end_date - timedelta(days=28)
+        else:  # all_data
+            start_date = datetime(2020, 1, 1)
+        
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+        
+        conn = sqlite3.connect(self.db_path)
+        query = f'''
+            SELECT date, ticket_id, quality, comment, experiment_name
+            FROM ticket_evaluations 
+            WHERE date >= ? AND date <= ?
+            ORDER BY date, ticket_id
+        '''
+        df = pd.read_sql_query(query, conn, params=(start_date_str, end_date_str))
+        conn.close()
+        
+        return self.process_dataframe(df, start_date, end_date)
+    
+    def process_dataframe(self, df, start_date, end_date):
+        """Process raw dataframe into daily aggregated data"""
+        # Initialize daily data structure
+        daily_data = {}
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            daily_data[date_str] = {
+                'date': date_str,
+                'copy_paste_count': 0,
+                'low_quality_count': 0,
+                'skipped_count': 0,
+                'management_company_ticket_count': 0,
+                'total_evaluated': 0,
+                'total_tickets': 0,
+                'experiment_name': f"zendesk-evaluation-{date_str}",
+                'low_quality_tickets': []
+            }
+            current_date += timedelta(days=1)
+        
+        # Process the data
+        for _, row in df.iterrows():
+            date_str = row['date']
+            if date_str in daily_data:
+                daily_data[date_str]['total_tickets'] += 1
+                
+                quality = row['quality']
+                comment = row['comment']
+                ticket_id = row['ticket_id']
+                
+                if quality == "copy_paste":
+                    daily_data[date_str]['copy_paste_count'] += 1
+                    daily_data[date_str]['total_evaluated'] += 1
+                elif quality == "low_quality":
+                    daily_data[date_str]['low_quality_count'] += 1
+                    daily_data[date_str]['total_evaluated'] += 1
+                    daily_data[date_str]['low_quality_tickets'].append(ticket_id)
+                elif comment == "empty_bot_answer":
+                    daily_data[date_str]['skipped_count'] += 1
+                elif comment == "management_company_ticket":
+                    daily_data[date_str]['management_company_ticket_count'] += 1
+                else:
+                    daily_data[date_str]['total_evaluated'] += 1
+        
+        # Convert to DataFrame
+        result_df = pd.DataFrame(list(daily_data.values()))
+        result_df['date'] = pd.to_datetime(result_df['date'])
+        result_df = result_df.sort_values('date')
+        
+        return result_df, daily_data
+    
+    def get_low_quality_tickets(self, date_range="2_weeks"):
+        """Get all low quality tickets for the specified date range"""
+        end_date = datetime.now()
+        if date_range == "2_weeks":
+            start_date = end_date - timedelta(days=14)
+        elif date_range == "4_weeks":
+            start_date = end_date - timedelta(days=28)
+        else:  # all_data
+            start_date = datetime(2020, 1, 1)
+        
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+        
+        conn = sqlite3.connect(self.db_path)
+        query = f'''
+            SELECT date, ticket_id
+            FROM ticket_evaluations 
+            WHERE date >= ? AND date <= ? AND quality = 'low_quality'
+            ORDER BY date, ticket_id
+        '''
+        df = pd.read_sql_query(query, conn, params=(start_date_str, end_date_str))
+        conn.close()
+        
+        return df.to_dict('records') 
