@@ -158,7 +158,7 @@ def create_weekly_percentage_chart(df):
         y=weekly_stats['evaluated_pct'],
         mode='lines+markers',
         name='Evaluated Ticket %',
-        line=dict(color='#6BB643', width=3),
+        line=dict(color='#2176A5', width=3),
         marker=dict(size=8)
     ))
     
@@ -167,7 +167,7 @@ def create_weekly_percentage_chart(df):
         y=weekly_stats['copy_paste_pct'],
         mode='lines+markers',
         name='Copy/Paste %',
-        line=dict(color='#2176A5', width=3), 
+        line=dict(color='#6BB643', width=3), 
         marker=dict(size=8)
     ))
     
