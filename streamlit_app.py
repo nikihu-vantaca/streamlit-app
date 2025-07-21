@@ -132,6 +132,66 @@ def create_skipped_management_chart(df):
     
     return fig
 
+
+def create_weekly_percentage_chart(df):
+    """Create line chart showing weekly percentages for evaluated and copy-paste tickets"""
+    # Group by week and calculate percentages
+    df_weekly = df.copy()
+    df_weekly['week'] = df_weekly['date'].dt.to_period('W').dt.start_time
+    df_weekly['week_label'] = df_weekly['week'].dt.strftime('Week of %-m/%-d')
+    
+    weekly_stats = df_weekly.groupby('week_label').agg({
+        'total_tickets': 'sum',
+        'total_evaluated': 'sum',
+        'copy_paste_count': 'sum'
+    }).reset_index()
+    
+    # Calculate percentages
+    weekly_stats['evaluated_pct'] = (weekly_stats['total_evaluated'] / weekly_stats['total_tickets'] * 100).round(1)
+    weekly_stats['copy_paste_pct'] = (weekly_stats['copy_paste_count'] / weekly_stats['total_evaluated'] * 100).round(1)
+    
+    # Create the line chart
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=weekly_stats['week_label'],
+        y=weekly_stats['evaluated_pct'],
+        mode='lines+markers',
+        name='Evaluated Ticket %',
+        line=dict(color='#2176A5', width=3),
+        marker=dict(size=8)
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=weekly_stats['week_label'],
+        y=weekly_stats['copy_paste_pct'],
+        mode='lines+markers',
+        name='Copy/Paste %',
+        line=dict(color='#8B4513', width=3),  # Brown color
+        marker=dict(size=8)
+    ))
+    
+    fig.update_layout(
+        title='Evaluated vs. Copy-Paste Tickets (% by Week)',
+        xaxis_title='Week',
+        yaxis_title='Percentage (%)',
+        height=500,
+        yaxis=dict(
+            range=[0, 100],
+            tickmode='linear',
+            tick0=0,
+            dtick=10,
+            gridcolor='lightgray'
+        ),
+        xaxis=dict(
+            gridcolor='lightgray'
+        ),
+        plot_bgcolor='white',
+        hovermode='x unified'
+    )
+    
+    return fig
+
 def create_summary_metrics(df):
     """Create summary metrics for the entire 2-week period"""
     total_copy_paste = df['copy_paste_count'].sum()
@@ -312,6 +372,9 @@ def main():
     
     # Skipped and management tickets chart
     st.plotly_chart(create_skipped_management_chart(df), use_container_width=True)
+    
+    # Weekly percentage chart
+    st.plotly_chart(create_weekly_percentage_chart(df), use_container_width=True)
     
     # Data table
     st.subheader("📋 Daily Breakdown")
