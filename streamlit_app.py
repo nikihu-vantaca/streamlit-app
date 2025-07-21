@@ -150,6 +150,9 @@ def create_weekly_percentage_chart(df):
     weekly_stats['evaluated_pct'] = (weekly_stats['total_evaluated'] / weekly_stats['total_tickets'] * 100).round(1)
     weekly_stats['copy_paste_pct'] = (weekly_stats['copy_paste_count'] / weekly_stats['total_evaluated'] * 100).round(1)
     
+    # Sort by week to ensure chronological order
+    weekly_stats = weekly_stats.sort_values('week_label')
+    
     # Create the line chart
     fig = go.Figure()
     
@@ -159,7 +162,8 @@ def create_weekly_percentage_chart(df):
         mode='lines+markers',
         name='Evaluated Ticket %',
         line=dict(color='#2176A5', width=3),
-        marker=dict(size=8)
+        marker=dict(size=8),
+        connectgaps=True
     ))
     
     fig.add_trace(go.Scatter(
@@ -168,7 +172,8 @@ def create_weekly_percentage_chart(df):
         mode='lines+markers',
         name='Copy/Paste %',
         line=dict(color='#6BB643', width=3), 
-        marker=dict(size=8)
+        marker=dict(size=8),
+        connectgaps=True
     ))
     
     fig.update_layout(
