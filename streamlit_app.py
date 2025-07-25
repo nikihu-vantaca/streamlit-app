@@ -1,13 +1,20 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.express as px
+import pandas as pd
 from datetime import datetime, timedelta
 import json
+import io
+import csv
 from langsmith import Client
 import re
 from collections import defaultdict
 from database import TicketDatabase
+
+# Debug: Print to verify code is updated
+print("🚀 Streamlit app loaded - Updated version v2.1!")
+
+# Version: 2.1 - Fixed evaluation logic and database migration
 
 # Page configuration
 st.set_page_config(
@@ -447,8 +454,6 @@ def main():
     with col3:
         low_quality_tickets = db.get_low_quality_tickets(date_range_param)
         if low_quality_tickets:
-            import io
-            import csv
             output = io.StringIO()
             writer = csv.DictWriter(output, fieldnames=['Date', 'Ticket ID', 'Ticket Type'])
             writer.writeheader()

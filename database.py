@@ -6,6 +6,7 @@ from langsmith import Client
 import re
 from collections import defaultdict
 
+# Updated database module with proper evaluation logic
 class TicketDatabase:
     def __init__(self, db_path='ticket_data.db'):
         self.db_path = db_path
