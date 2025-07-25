@@ -22,6 +22,7 @@ class TicketDatabase:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date TEXT NOT NULL,
                 ticket_id INTEGER NOT NULL,
+                ticket_type TEXT DEFAULT 'homeowner',
                 quality TEXT,
                 comment TEXT,
                 experiment_name TEXT,
@@ -103,6 +104,15 @@ class TicketDatabase:
                     if ticket_id is None:
                         ticket_id = result.get('ticket_id')
                     
+                    # Determine ticket type based on evaluation key
+                    evaluation_key = result.get('key', '')
+                    ticket_type = 'homeowner'  # default
+                    if evaluation_key == 'management_ticket_evaluation':
+                        ticket_type = 'management'
+                    elif evaluation_key == 'bot_evaluation':
+                        ticket_type = 'homeowner'
+                    # If key is not recognized, keep default as 'homeowner'
+                    
                     # Extract start_time
                     start_time = getattr(run, "start_time", None)
                     if isinstance(start_time, str):
@@ -116,7 +126,7 @@ class TicketDatabase:
                     
                     key = (date_str, ticket_id)
                     if ticket_id is not None and (key not in latest_runs or start_time_dt > latest_runs[key][0]):
-                        latest_runs[key] = (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time)
+                        latest_runs[key] = (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time, ticket_type)
             
             # Store new/updated data
             if latest_runs:
@@ -145,12 +155,12 @@ class TicketDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        for (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time) in evaluations.values():
+        for (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time, ticket_type) in evaluations.values():
             cursor.execute('''
                 INSERT OR REPLACE INTO ticket_evaluations 
-                (date, ticket_id, quality, comment, experiment_name, start_time)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (date_str, ticket_id, quality, comment, experiment, start_time))
+                (date, ticket_id, ticket_type, quality, comment, experiment_name, start_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (date_str, ticket_id, ticket_type, quality, comment, experiment, start_time))
         
         conn.commit()
         conn.close()
@@ -170,7 +180,7 @@ class TicketDatabase:
         
         conn = sqlite3.connect(self.db_path)
         query = f'''
-            SELECT date, ticket_id, quality, comment, experiment_name
+            SELECT date, ticket_id, quality, comment, experiment_name, ticket_type
             FROM ticket_evaluations 
             WHERE date >= ? AND date <= ?
             ORDER BY date, ticket_id
@@ -209,7 +219,15 @@ class TicketDatabase:
                 quality = row['quality']
                 comment = row['comment']
                 ticket_id = row['ticket_id']
+                ticket_type = row.get('ticket_type', 'homeowner')
                 
+                # Handle management tickets
+                if ticket_type == 'management':
+                    daily_data[date_str]['management_company_ticket_count'] += 1
+                    # For management tickets, we don't count them in other categories
+                    continue
+                
+                # Handle homeowner tickets
                 if quality == "copy_paste":
                     daily_data[date_str]['copy_paste_count'] += 1
                     daily_data[date_str]['total_evaluated'] += 1
@@ -219,8 +237,6 @@ class TicketDatabase:
                     daily_data[date_str]['low_quality_tickets'].append(ticket_id)
                 elif comment == "empty_bot_answer":
                     daily_data[date_str]['skipped_count'] += 1
-                elif comment == "management_company_ticket":
-                    daily_data[date_str]['management_company_ticket_count'] += 1
                 else:
                     daily_data[date_str]['total_evaluated'] += 1
         
@@ -246,7 +262,7 @@ class TicketDatabase:
         
         conn = sqlite3.connect(self.db_path)
         query = f'''
-            SELECT date, ticket_id
+            SELECT date, ticket_id, ticket_type
             FROM ticket_evaluations 
             WHERE date >= ? AND date <= ? AND quality = 'low_quality'
             ORDER BY date, ticket_id

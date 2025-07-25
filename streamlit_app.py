@@ -341,7 +341,7 @@ def main():
         st.metric(
             "Management Company Tickets",
             f"{metrics['total_management']:,}",
-            help="Skipped management company tickets"
+            help="Management company tickets processed (with management_ticket_evaluation key)"
         )
     
     # Pie charts for evaluation and copy-paste rates
@@ -432,14 +432,15 @@ def main():
             import io
             import csv
             output = io.StringIO()
-            writer = csv.DictWriter(output, fieldnames=['Date', 'Ticket ID'])
+            writer = csv.DictWriter(output, fieldnames=['Date', 'Ticket ID', 'Ticket Type'])
             writer.writeheader()
             # Convert database field names to CSV field names
             formatted_tickets = []
             for ticket in low_quality_tickets:
                 formatted_tickets.append({
                     'Date': ticket['date'],
-                    'Ticket ID': ticket['ticket_id']
+                    'Ticket ID': ticket['ticket_id'],
+                    'Ticket Type': ticket.get('ticket_type', 'homeowner')
                 })
             writer.writerows(formatted_tickets)
             st.download_button(
