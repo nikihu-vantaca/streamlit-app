@@ -25,6 +25,7 @@ class TicketDatabase:
                 ticket_type TEXT DEFAULT 'homeowner',
                 quality TEXT,
                 comment TEXT,
+                evaluation_key TEXT,
                 experiment_name TEXT,
                 start_time TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -88,6 +89,7 @@ class TicketDatabase:
                     
                     quality = result.get("quality")
                     comment = result.get("comment")
+                    evaluation_key = result.get("key", "")  # Extract the evaluation key
                     
                     # Extract ticket_id
                     ticket_id = None
@@ -105,7 +107,6 @@ class TicketDatabase:
                         ticket_id = result.get('ticket_id')
                     
                     # Determine ticket type based on evaluation key
-                    evaluation_key = result.get('key', '')
                     ticket_type = 'homeowner'  # default
                     if evaluation_key == 'management_ticket_evaluation':
                         ticket_type = 'management'
@@ -126,7 +127,7 @@ class TicketDatabase:
                     
                     key = (date_str, ticket_id)
                     if ticket_id is not None and (key not in latest_runs or start_time_dt > latest_runs[key][0]):
-                        latest_runs[key] = (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time, ticket_type)
+                        latest_runs[key] = (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time, ticket_type, evaluation_key)
             
             # Store new/updated data
             if latest_runs:
@@ -155,12 +156,12 @@ class TicketDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        for (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time, ticket_type) in evaluations.values():
+        for (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time, ticket_type, evaluation_key) in evaluations.values():
             cursor.execute('''
                 INSERT OR REPLACE INTO ticket_evaluations 
-                (date, ticket_id, ticket_type, quality, comment, experiment_name, start_time)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (date_str, ticket_id, ticket_type, quality, comment, experiment, start_time))
+                (date, ticket_id, ticket_type, quality, comment, evaluation_key, experiment_name, start_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (date_str, ticket_id, ticket_type, quality, comment, evaluation_key, experiment, start_time))
         
         conn.commit()
         conn.close()
@@ -180,7 +181,7 @@ class TicketDatabase:
         
         conn = sqlite3.connect(self.db_path)
         query = f'''
-            SELECT date, ticket_id, quality, comment, experiment_name, ticket_type
+            SELECT date, ticket_id, quality, comment, experiment_name, ticket_type, evaluation_key
             FROM ticket_evaluations 
             WHERE date >= ? AND date <= ?
             ORDER BY date, ticket_id
@@ -220,25 +221,28 @@ class TicketDatabase:
                 comment = row['comment']
                 ticket_id = row['ticket_id']
                 ticket_type = row.get('ticket_type', 'homeowner')
+                evaluation_key = row.get('evaluation_key', '')
                 
                 # Handle management tickets
-                if ticket_type == 'management':
+                if ticket_type == 'management' or evaluation_key == 'management_ticket_evaluation':
                     daily_data[date_str]['management_company_ticket_count'] += 1
                     # For management tickets, we don't count them in other categories
                     continue
                 
-                # Handle homeowner tickets
-                if quality == "copy_paste":
-                    daily_data[date_str]['copy_paste_count'] += 1
-                    daily_data[date_str]['total_evaluated'] += 1
-                elif quality == "low_quality":
-                    daily_data[date_str]['low_quality_count'] += 1
-                    daily_data[date_str]['total_evaluated'] += 1
-                    daily_data[date_str]['low_quality_tickets'].append(ticket_id)
-                elif comment == "empty_bot_answer":
-                    daily_data[date_str]['skipped_count'] += 1
-                else:
-                    daily_data[date_str]['total_evaluated'] += 1
+                # Handle homeowner tickets (only these count as "evaluated")
+                if evaluation_key == 'bot_evaluation':
+                    if quality == "copy_paste":
+                        daily_data[date_str]['copy_paste_count'] += 1
+                        daily_data[date_str]['total_evaluated'] += 1
+                    elif quality == "low_quality":
+                        daily_data[date_str]['low_quality_count'] += 1
+                        daily_data[date_str]['total_evaluated'] += 1
+                        daily_data[date_str]['low_quality_tickets'].append(ticket_id)
+                    elif comment == "empty_bot_answer":
+                        daily_data[date_str]['skipped_count'] += 1
+                    elif quality is not None:  # Any other quality value means it was evaluated
+                        daily_data[date_str]['total_evaluated'] += 1
+                # Note: only tickets with evaluation_key='bot_evaluation' count as evaluated
         
         # Convert to DataFrame
         result_df = pd.DataFrame(list(daily_data.values()))
