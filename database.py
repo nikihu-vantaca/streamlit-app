@@ -240,9 +240,10 @@ class TicketDatabase:
                         daily_data[date_str]['low_quality_tickets'].append(ticket_id)
                     elif comment == "empty_bot_answer":
                         daily_data[date_str]['skipped_count'] += 1
-                    elif quality is not None:  # Any other quality value means it was evaluated
+                    else:
+                        # All bot_evaluation tickets count as evaluated, including those with quality: null
                         daily_data[date_str]['total_evaluated'] += 1
-                # Note: only tickets with evaluation_key='bot_evaluation' count as evaluated
+                    # Note: all bot_evaluation tickets are counted as evaluated, regardless of quality value
         
         # Convert to DataFrame
         result_df = pd.DataFrame(list(daily_data.values()))
