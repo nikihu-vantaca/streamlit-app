@@ -232,27 +232,30 @@ class TicketDatabase:
                 ticket_type = row.get('ticket_type', 'homeowner')
                 evaluation_key = row.get('evaluation_key', '')
                 
-                # Handle management tickets
+                # Handle management tickets - EXCLUDE from evaluation counts
                 if ticket_type == 'management' or evaluation_key == 'management_ticket_evaluation':
                     daily_data[date_str]['management_company_ticket_count'] += 1
-                    # For management tickets, we don't count them in other categories
+                    # Management tickets are NOT counted in total_evaluated - they're tracked separately
                     continue
                 
-                # Handle homeowner tickets (only these count as "evaluated")
+                # Handle homeowner tickets (bot_evaluation key) - ONLY these count as "evaluated"
                 if evaluation_key == 'bot_evaluation':
+                    # Check for skipped tickets first
+                    if comment == "empty_bot_answer":
+                        daily_data[date_str]['skipped_count'] += 1
+                        # Skipped tickets are NOT counted as evaluated
+                        continue
+                    
+                    # All non-skipped bot_evaluation tickets count as evaluated
+                    daily_data[date_str]['total_evaluated'] += 1
+                    
+                    # Now categorize the quality
                     if quality == "copy_paste":
                         daily_data[date_str]['copy_paste_count'] += 1
-                        daily_data[date_str]['total_evaluated'] += 1
                     elif quality == "low_quality":
                         daily_data[date_str]['low_quality_count'] += 1
-                        daily_data[date_str]['total_evaluated'] += 1
                         daily_data[date_str]['low_quality_tickets'].append(ticket_id)
-                    elif comment == "empty_bot_answer":
-                        daily_data[date_str]['skipped_count'] += 1
-                    else:
-                        # All bot_evaluation tickets count as evaluated, including those with quality: null
-                        daily_data[date_str]['total_evaluated'] += 1
-                    # Note: all bot_evaluation tickets are counted as evaluated, regardless of quality value
+                    # Note: tickets with quality=null are still counted as evaluated, just not in specific quality categories
         
         # Convert to DataFrame
         result_df = pd.DataFrame(list(daily_data.values()))
@@ -284,4 +287,4 @@ class TicketDatabase:
         df = pd.read_sql_query(query, conn, params=(start_date_str, end_date_str))
         conn.close()
         
-        return df.to_dict('records') 
+        return df.to_dict('records')
