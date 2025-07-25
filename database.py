@@ -48,8 +48,47 @@ class TicketDatabase:
             ON ticket_evaluations(date, ticket_id)
         ''')
         
+        # Run migration to fix existing data
+        self.migrate_ticket_types(cursor)
+        
         conn.commit()
         conn.close()
+    
+    def migrate_ticket_types(self, cursor):
+        """Migrate existing data to fix ticket_type based on evaluation_key"""
+        try:
+            # Check if migration is needed
+            cursor.execute('''
+                SELECT COUNT(*) FROM ticket_evaluations 
+                WHERE evaluation_key = 'management_ticket_evaluation' AND ticket_type != 'management'
+            ''')
+            needs_migration = cursor.fetchone()[0] > 0
+            
+            if needs_migration:
+                print("Migrating existing data to fix ticket types...")
+                
+                # Update ticket_type to 'management' where evaluation_key is 'management_ticket_evaluation'
+                cursor.execute('''
+                    UPDATE ticket_evaluations 
+                    SET ticket_type = 'management' 
+                    WHERE evaluation_key = 'management_ticket_evaluation'
+                ''')
+                
+                # Update ticket_type to 'homeowner' where evaluation_key is 'bot_evaluation'
+                cursor.execute('''
+                    UPDATE ticket_evaluations 
+                    SET ticket_type = 'homeowner' 
+                    WHERE evaluation_key = 'bot_evaluation'
+                ''')
+                
+                updated_rows = cursor.rowcount
+                print(f"Migration completed: Updated {updated_rows} rows")
+            else:
+                print("No migration needed - data is already correct")
+                
+        except Exception as e:
+            print(f"Migration error: {str(e)}")
+            # Don't fail initialization if migration fails
     
     def fetch_and_store_latest_data(self, api_key, project_name="evaluators"):
         """Fetch latest data from LangSmith and store in database"""
@@ -288,3 +327,90 @@ class TicketDatabase:
         conn.close()
         
         return df.to_dict('records')
+    
+    def debug_database_contents(self):
+        """Debug method to check current database contents"""
+        conn = sqlite3.connect(self.db_path)
+        
+        print("=== DATABASE DEBUG INFO ===")
+        
+        # Check total records
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM ticket_evaluations')
+        total_records = cursor.fetchone()[0]
+        print(f"Total records: {total_records}")
+        
+        # Check by evaluation_key
+        cursor.execute('''
+            SELECT evaluation_key, ticket_type, COUNT(*) 
+            FROM ticket_evaluations 
+            GROUP BY evaluation_key, ticket_type
+        ''')
+        print("\nBreakdown by evaluation_key and ticket_type:")
+        for row in cursor.fetchall():
+            print(f"  Key: {row[0]}, Type: {row[1]}, Count: {row[2]}")
+        
+        # Check recent records
+        cursor.execute('''
+            SELECT date, ticket_id, evaluation_key, ticket_type, quality, comment 
+            FROM ticket_evaluations 
+            ORDER BY date DESC, ticket_id DESC 
+            LIMIT 10
+        ''')
+        print("\nSample recent records:")
+        for row in cursor.fetchall():
+            print(f"  {row[0]} | Ticket {row[1]} | Key: {row[2]} | Type: {row[3]} | Quality: {row[4]} | Comment: {row[5][:50]}...")
+        
+        conn.close()
+    
+    def force_migrate_data(self):
+        """Force migration of existing data - call this manually if needed"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        print("=== FORCING DATA MIGRATION ===")
+        
+        # Show current state
+        cursor.execute('''
+            SELECT evaluation_key, ticket_type, COUNT(*) 
+            FROM ticket_evaluations 
+            GROUP BY evaluation_key, ticket_type
+        ''')
+        print("Before migration:")
+        for row in cursor.fetchall():
+            print(f"  Key: {row[0]}, Type: {row[1]}, Count: {row[2]}")
+        
+        # Update management tickets
+        cursor.execute('''
+            UPDATE ticket_evaluations 
+            SET ticket_type = 'management' 
+            WHERE evaluation_key = 'management_ticket_evaluation'
+        ''')
+        mgmt_updated = cursor.rowcount
+        
+        # Update homeowner tickets  
+        cursor.execute('''
+            UPDATE ticket_evaluations 
+            SET ticket_type = 'homeowner' 
+            WHERE evaluation_key = 'bot_evaluation'
+        ''')
+        homeowner_updated = cursor.rowcount
+        
+        conn.commit()
+        
+        print(f"\nUpdated {mgmt_updated} management tickets")
+        print(f"Updated {homeowner_updated} homeowner tickets")
+        
+        # Show new state
+        cursor.execute('''
+            SELECT evaluation_key, ticket_type, COUNT(*) 
+            FROM ticket_evaluations 
+            GROUP BY evaluation_key, ticket_type
+        ''')
+        print("\nAfter migration:")
+        for row in cursor.fetchall():
+            print(f"  Key: {row[0]}, Type: {row[1]}, Count: {row[2]}")
+            
+        conn.close()
+        print("=== MIGRATION COMPLETED ===")
+        return mgmt_updated + homeowner_updated
