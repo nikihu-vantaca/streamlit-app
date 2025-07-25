@@ -223,6 +223,10 @@ class TicketDatabase:
                 ticket_type = row.get('ticket_type', 'homeowner')
                 evaluation_key = row.get('evaluation_key', '')
                 
+                # Debug: Print tickets for 2025-07-24
+                if date_str == '2025-07-24':
+                    print(f"Ticket {ticket_id}: type={ticket_type}, key={evaluation_key}, quality={quality}, comment={comment}")
+                
                 # Handle management tickets
                 if ticket_type == 'management' or evaluation_key == 'management_ticket_evaluation':
                     daily_data[date_str]['management_company_ticket_count'] += 1
@@ -249,6 +253,17 @@ class TicketDatabase:
         result_df = pd.DataFrame(list(daily_data.values()))
         result_df['date'] = pd.to_datetime(result_df['date'])
         result_df = result_df.sort_values('date')
+        
+        # Debug: Print summary for 2025-07-24
+        if '2025-07-24' in daily_data:
+            day_data = daily_data['2025-07-24']
+            print(f"\n2025-07-24 Summary:")
+            print(f"  Total tickets: {day_data['total_tickets']}")
+            print(f"  Total evaluated: {day_data['total_evaluated']}")
+            print(f"  Copy paste: {day_data['copy_paste_count']}")
+            print(f"  Low quality: {day_data['low_quality_count']}")
+            print(f"  Skipped: {day_data['skipped_count']}")
+            print(f"  Management: {day_data['management_company_ticket_count']}")
         
         return result_df, daily_data
     
