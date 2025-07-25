@@ -48,18 +48,21 @@ def get_database():
 
 def create_quality_bar_chart(df):
     """Create bar chart for copy_paste and low_quality counts"""
+    # Ensure data is sorted chronologically
+    df_sorted = df.sort_values('date')
+    
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'],
-        y=df['copy_paste_count'],
+        x=df_sorted['date'],
+        y=df_sorted['copy_paste_count'],
         name='Copy Paste',
         marker_color='#2176A5'  # blue
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'],
-        y=df['low_quality_count'],
+        x=df_sorted['date'],
+        y=df_sorted['low_quality_count'],
         name='Low Quality',
         marker_color='#6BB643'  # green
     ))
@@ -77,18 +80,21 @@ def create_quality_bar_chart(df):
 
 def create_total_tickets_chart(df):
     """Create bar chart for total evaluated vs total tickets"""
+    # Ensure data is sorted chronologically
+    df_sorted = df.sort_values('date')
+    
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'],
-        y=df['total_tickets'],
+        x=df_sorted['date'],
+        y=df_sorted['total_tickets'],
         name='Total Tickets',
         marker_color='#2176A5'  # blue
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'],
-        y=df['total_evaluated'],
+        x=df_sorted['date'],
+        y=df_sorted['total_evaluated'],
         name='Evaluated Tickets',
         marker_color='#6BB643'  # green
     ))
@@ -106,18 +112,21 @@ def create_total_tickets_chart(df):
 
 def create_skipped_management_chart(df):
     """Create bar chart for skipped and management company tickets"""
+    # Ensure data is sorted chronologically
+    df_sorted = df.sort_values('date')
+    
     fig = go.Figure()
     
     fig.add_trace(go.Bar(
-        x=df['date'],
-        y=df['skipped_count'],
+        x=df_sorted['date'],
+        y=df_sorted['skipped_count'],
         name='Skipped Tickets',
         marker_color='#2176A5'  # blue
     ))
     
     fig.add_trace(go.Bar(
-        x=df['date'],
-        y=df['management_company_ticket_count'],
+        x=df_sorted['date'],
+        y=df_sorted['management_company_ticket_count'],
         name='Management Company Tickets',
         marker_color='#6BB643'  # green
     ))
@@ -150,8 +159,13 @@ def create_weekly_percentage_chart(df):
     weekly_stats['evaluated_pct'] = (weekly_stats['total_evaluated'] / weekly_stats['total_tickets'] * 100).round(1)
     weekly_stats['copy_paste_pct'] = (weekly_stats['copy_paste_count'] / weekly_stats['total_evaluated'] * 100).round(1)
     
-    # Sort by week to ensure chronological order
-    weekly_stats = weekly_stats.sort_values('week_label')
+    # Sort by actual week start date to ensure chronological order
+    df_weekly_temp = df_weekly[['week', 'week_label']].drop_duplicates()
+    week_order = df_weekly_temp.sort_values('week')['week_label'].tolist()
+    
+    # Reorder the weekly_stats DataFrame based on chronological week order
+    weekly_stats['week_order'] = weekly_stats['week_label'].map({week: i for i, week in enumerate(week_order)})
+    weekly_stats = weekly_stats.sort_values('week_order').drop('week_order', axis=1)
     
     # Create the line chart
     fig = go.Figure()
@@ -286,6 +300,9 @@ def main():
         st.warning("No data found from July 2025 onwards. Try syncing data first!")
         return
     
+    # Ensure data is sorted chronologically
+    df = df.sort_values('date')
+    
     # Create summary metrics
     metrics = create_summary_metrics(df)
     
@@ -392,8 +409,9 @@ def main():
     # Data table
     st.subheader("📋 Daily Breakdown")
     
-    # Format the dataframe for display
+    # Format the dataframe for display and ensure chronological order
     display_df = df.copy()
+    display_df = display_df.sort_values('date')  # Sort chronologically
     display_df['Date'] = display_df['date'].dt.strftime('%Y-%m-%d')
     display_df = display_df[['Date', 'total_tickets', 'total_evaluated', 'copy_paste_count', 
                            'low_quality_count', 'skipped_count', 'management_company_ticket_count']]
