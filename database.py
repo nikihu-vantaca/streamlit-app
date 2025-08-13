@@ -112,7 +112,7 @@ class TicketDatabase:
                     continue
                     
                 # Check if it's a zendesk evaluation experiment
-                if not experiment.startswith("zendesk-evaluation-2025-07-"):
+                if not experiment.startswith("zendesk-evaluation-"):
                     continue
                     
                 # Extract date from experiment name
