@@ -226,7 +226,7 @@ def create_summary_metrics(df):
     total_tickets = df['total_tickets'].sum()
     total_skipped = df['skipped_count'].sum()
     total_management = df['management_company_ticket_count'].sum()
-    total_implementation = df.get('implementation_ticket_count', 0).sum()  # New field
+    total_implementation = df['implementation_ticket_count'].sum() if 'implementation_ticket_count' in df.columns else 0
     
     # Calculate percentages
     copy_paste_pct = (total_copy_paste / total_evaluated * 100) if total_evaluated > 0 else 0
@@ -433,11 +433,28 @@ def main():
     display_df = df.copy()
     display_df = display_df.sort_values('date')  # Sort chronologically
     display_df['Date'] = display_df['date'].dt.strftime('%Y-%m-%d')
-    display_df = display_df[['Date', 'total_tickets', 'total_evaluated', 'copy_paste_count', 
-                           'low_quality_count', 'skipped_count', 'management_company_ticket_count', 'implementation_ticket_count']]
+    # Handle columns that might not exist
+    available_columns = ['Date', 'total_tickets', 'total_evaluated', 'copy_paste_count', 
+                        'low_quality_count', 'skipped_count', 'management_company_ticket_count']
     
-    display_df.columns = ['Date', 'Total Tickets', 'Evaluated', 'Copy Paste', 
-                         'Low Quality', 'Skipped', 'Management Co.', 'Implementation']
+    if 'implementation_ticket_count' in display_df.columns:
+        available_columns.append('implementation_ticket_count')
+    
+    display_df = display_df[available_columns]
+    
+    # Map column names
+    column_mapping = {
+        'Date': 'Date',
+        'total_tickets': 'Total Tickets',
+        'total_evaluated': 'Evaluated',
+        'copy_paste_count': 'Copy Paste',
+        'low_quality_count': 'Low Quality',
+        'skipped_count': 'Skipped',
+        'management_company_ticket_count': 'Management Co.',
+        'implementation_ticket_count': 'Implementation'
+    }
+    
+    display_df.columns = [column_mapping[col] for col in available_columns]
     
     st.dataframe(display_df, use_container_width=True, hide_index=True)
     
