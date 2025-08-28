@@ -6,7 +6,6 @@ from langsmith import Client
 import re
 from collections import defaultdict
 
-# Updated database module with proper evaluation logic
 class TicketDatabase:
     def __init__(self, db_path='ticket_data.db'):
         self.db_path = db_path
@@ -48,47 +47,8 @@ class TicketDatabase:
             ON ticket_evaluations(date, ticket_id)
         ''')
         
-        # Run migration to fix existing data
-        self.migrate_ticket_types(cursor)
-        
         conn.commit()
         conn.close()
-    
-    def migrate_ticket_types(self, cursor):
-        """Migrate existing data to fix ticket_type based on evaluation_key"""
-        try:
-            # Check if migration is needed
-            cursor.execute('''
-                SELECT COUNT(*) FROM ticket_evaluations 
-                WHERE evaluation_key = 'management_ticket_evaluation' AND ticket_type != 'management'
-            ''')
-            needs_migration = cursor.fetchone()[0] > 0
-            
-            if needs_migration:
-                print("Migrating existing data to fix ticket types...")
-                
-                # Update ticket_type to 'management' where evaluation_key is 'management_ticket_evaluation'
-                cursor.execute('''
-                    UPDATE ticket_evaluations 
-                    SET ticket_type = 'management' 
-                    WHERE evaluation_key = 'management_ticket_evaluation'
-                ''')
-                
-                # Update ticket_type to 'homeowner' where evaluation_key is 'bot_evaluation'
-                cursor.execute('''
-                    UPDATE ticket_evaluations 
-                    SET ticket_type = 'homeowner' 
-                    WHERE evaluation_key = 'bot_evaluation'
-                ''')
-                
-                updated_rows = cursor.rowcount
-                print(f"Migration completed: Updated {updated_rows} rows")
-            else:
-                print("No migration needed - data is already correct")
-                
-        except Exception as e:
-            print(f"Migration error: {str(e)}")
-            # Don't fail initialization if migration fails
     
     def fetch_and_store_latest_data(self, api_key, project_name="evaluators"):
         """Fetch latest data from LangSmith and store in database"""
@@ -110,17 +70,11 @@ class TicketDatabase:
                 
                 if not experiment:
                     continue
-                    
-                # Check if it's a zendesk evaluation experiment
-                if not experiment.startswith("zendesk-evaluation-2025-07-"):
+                
+                # Determine date from experiment name
+                date_str = self.extract_date_from_experiment(experiment)
+                if not date_str:
                     continue
-                    
-                # Extract date from experiment name
-                date_match = re.search(r"zendesk-evaluation-(\d{4}-\d{2}-\d{2})", experiment)
-                if not date_match:
-                    continue
-                    
-                date_str = date_match.group(1)
                 
                 # Only process detailed_similarity_evaluator runs
                 if getattr(run, "name", None) == "detailed_similarity_evaluator" and getattr(run, "outputs", None):
@@ -137,30 +91,15 @@ class TicketDatabase:
                     
                     quality = result.get("quality")
                     comment = result.get("comment")
-                    evaluation_key = result.get("key", "")  # Extract the evaluation key
+                    evaluation_key = result.get("key", "")
                     
                     # Extract ticket_id
-                    ticket_id = None
-                    if hasattr(run, "inputs") and run.inputs:
-                        if isinstance(run.inputs, dict):
-                            if 'ticket_id' in run.inputs:
-                                ticket_id = run.inputs['ticket_id']
-                            elif 'x' in run.inputs and isinstance(run.inputs['x'], dict):
-                                ticket_id = run.inputs['x'].get('ticket_id')
-                            elif 'run' in run.inputs and isinstance(run.inputs['run'], dict):
-                                run_inputs = run.inputs['run'].get('inputs', {})
-                                if 'x' in run_inputs and isinstance(run_inputs['x'], dict):
-                                    ticket_id = run_inputs['x'].get('ticket_id')
+                    ticket_id = self.extract_ticket_id(run, result)
                     if ticket_id is None:
-                        ticket_id = result.get('ticket_id')
+                        continue
                     
-                    # Determine ticket type based on evaluation key
-                    ticket_type = 'homeowner'  # default
-                    if evaluation_key == 'management_ticket_evaluation':
-                        ticket_type = 'management'
-                    elif evaluation_key == 'bot_evaluation':
-                        ticket_type = 'homeowner'
-                    # If key is not recognized, keep default as 'homeowner'
+                    # Determine ticket type based on date and experiment
+                    ticket_type = self.determine_ticket_type(date_str, experiment, evaluation_key, comment)
                     
                     # Extract start_time
                     start_time = getattr(run, "start_time", None)
@@ -186,6 +125,83 @@ class TicketDatabase:
         except Exception as e:
             print(f"Error fetching data: {str(e)}")
             return 0
+    
+    def extract_date_from_experiment(self, experiment):
+        """Extract date from experiment name based on the evaluation system"""
+        # For pre-August 15, 2025: zendesk-evaluation-2025-07-XX format
+        if experiment.startswith("zendesk-evaluation-2025-"):
+            match = re.search(r"zendesk-evaluation-(\d{4}-\d{2}-\d{2})", experiment)
+            if match:
+                return match.group(1)
+        
+        # For post-August 15, 2025: implementation-evaluation-2025-XX-XX format
+        elif "implementation-evaluation-" in experiment:
+            match = re.search(r"implementation-evaluation-(\d{4}-\d{2}-\d{2})", experiment)
+            if match:
+                return match.group(1)
+        
+        # For post-August 15, 2025: homeowner-pay-evaluation-2025-XX-XX format
+        elif "homeowner-pay-evaluation-" in experiment:
+            match = re.search(r"homeowner-pay-evaluation-(\d{4}-\d{2}-\d{2})", experiment)
+            if match:
+                return match.group(1)
+        
+        # For post-August 15, 2025: management-pay-evaluation-2025-XX-XX format
+        elif "management-pay-evaluation-" in experiment:
+            match = re.search(r"management-pay-evaluation-(\d{4}-\d{2}-\d{2})", experiment)
+            if match:
+                return match.group(1)
+        
+        return None
+    
+    def extract_ticket_id(self, run, result):
+        """Extract ticket_id from run inputs or result"""
+        # Try to get from run inputs first
+        if hasattr(run, "inputs") and run.inputs:
+            if isinstance(run.inputs, dict):
+                if 'ticket_id' in run.inputs:
+                    return run.inputs['ticket_id']
+                elif 'x' in run.inputs and isinstance(run.inputs['x'], dict):
+                    return run.inputs['x'].get('ticket_id')
+                elif 'run' in run.inputs and isinstance(run.inputs['run'], dict):
+                    run_inputs = run.inputs['run'].get('inputs', {})
+                    if 'x' in run_inputs and isinstance(run_inputs['x'], dict):
+                        return run_inputs['x'].get('ticket_id')
+        
+        # Fallback to result
+        return result.get('ticket_id')
+    
+    def determine_ticket_type(self, date_str, experiment, evaluation_key, comment):
+        """Determine ticket type based on date and experiment"""
+        date_dt = datetime.strptime(date_str, "%Y-%m-%d")
+        cutoff_date = datetime(2025, 8, 15)
+        
+        if date_dt < cutoff_date:
+            # Pre-August 15, 2025: Use ungrouped logic
+            return self.determine_ticket_type_ungrouped(evaluation_key, comment)
+        else:
+            # Post-August 15, 2025: Use grouped logic
+            return self.determine_ticket_type_grouped(experiment)
+    
+    def determine_ticket_type_ungrouped(self, evaluation_key, comment):
+        """Determine ticket type for pre-August 15, 2025 (ungrouped system)"""
+        # Based on get_evaluation_ungrouped.py logic
+        if "management_ticket_evaluation" in evaluation_key or "management" in comment.lower():
+            return "management"
+        else:
+            return "homeowner"
+    
+    def determine_ticket_type_grouped(self, experiment):
+        """Determine ticket type for post-August 15, 2025 (grouped system)"""
+        # Based on get_evaluation_grouped.py logic
+        if "implementation-evaluation-" in experiment:
+            return "implementation"
+        elif "homeowner-pay-evaluation-" in experiment:
+            return "homeowner"
+        elif "management-pay-evaluation-" in experiment:
+            return "management"
+        else:
+            return "homeowner"  # default
     
     def get_latest_timestamp(self):
         """Get the latest start_time from the database"""
@@ -252,9 +268,10 @@ class TicketDatabase:
                 'low_quality_count': 0,
                 'skipped_count': 0,
                 'management_company_ticket_count': 0,
+                'implementation_ticket_count': 0,
                 'total_evaluated': 0,
                 'total_tickets': 0,
-                'experiment_name': f"zendesk-evaluation-{date_str}",
+                'experiment_name': f"evaluation-{date_str}",
                 'low_quality_tickets': []
             }
             current_date += timedelta(days=1)
@@ -271,30 +288,16 @@ class TicketDatabase:
                 ticket_type = row.get('ticket_type', 'homeowner')
                 evaluation_key = row.get('evaluation_key', '')
                 
-                # Handle management tickets - EXCLUDE from evaluation counts
-                if ticket_type == 'management' or evaluation_key == 'management_ticket_evaluation':
-                    daily_data[date_str]['management_company_ticket_count'] += 1
-                    # Management tickets are NOT counted in total_evaluated - they're tracked separately
-                    continue
+                # Handle different ticket types based on date
+                date_dt = datetime.strptime(date_str, "%Y-%m-%d")
+                cutoff_date = datetime(2025, 8, 15)
                 
-                # Handle homeowner tickets (bot_evaluation key) - ONLY these count as "evaluated"
-                if evaluation_key == 'bot_evaluation':
-                    # Check for skipped tickets first
-                    if comment == "empty_bot_answer":
-                        daily_data[date_str]['skipped_count'] += 1
-                        # Skipped tickets are NOT counted as evaluated
-                        continue
-                    
-                    # All non-skipped bot_evaluation tickets count as evaluated
-                    daily_data[date_str]['total_evaluated'] += 1
-                    
-                    # Now categorize the quality
-                    if quality == "copy_paste":
-                        daily_data[date_str]['copy_paste_count'] += 1
-                    elif quality == "low_quality":
-                        daily_data[date_str]['low_quality_count'] += 1
-                        daily_data[date_str]['low_quality_tickets'].append(ticket_id)
-                    # Note: tickets with quality=null are still counted as evaluated, just not in specific quality categories
+                if date_dt < cutoff_date:
+                    # Pre-August 15, 2025: Use ungrouped logic
+                    self.process_ungrouped_ticket(daily_data[date_str], ticket_type, quality, comment, ticket_id, evaluation_key)
+                else:
+                    # Post-August 15, 2025: Use grouped logic
+                    self.process_grouped_ticket(daily_data[date_str], ticket_type, quality, comment, ticket_id)
         
         # Convert to DataFrame
         result_df = pd.DataFrame(list(daily_data.values()))
@@ -302,6 +305,53 @@ class TicketDatabase:
         result_df = result_df.sort_values('date')
         
         return result_df, daily_data
+    
+    def process_ungrouped_ticket(self, day_data, ticket_type, quality, comment, ticket_id, evaluation_key):
+        """Process ticket for pre-August 15, 2025 (ungrouped system)"""
+        # Handle management tickets - EXCLUDE from evaluation counts
+        if ticket_type == 'management' or evaluation_key == 'management_ticket_evaluation':
+            day_data['management_company_ticket_count'] += 1
+            return
+        
+        # Handle homeowner tickets (bot_evaluation key) - ONLY these count as "evaluated"
+        if evaluation_key == 'bot_evaluation':
+            # Check for skipped tickets first
+            if comment == "empty_bot_answer":
+                day_data['skipped_count'] += 1
+                return
+            
+            # All non-skipped bot_evaluation tickets count as evaluated
+            day_data['total_evaluated'] += 1
+            
+            # Now categorize the quality
+            if quality == "copy_paste":
+                day_data['copy_paste_count'] += 1
+            elif quality == "low_quality":
+                day_data['low_quality_count'] += 1
+                day_data['low_quality_tickets'].append(ticket_id)
+    
+    def process_grouped_ticket(self, day_data, ticket_type, quality, comment, ticket_id):
+        """Process ticket for post-August 15, 2025 (grouped system)"""
+        # All tickets count as evaluated in the grouped system
+        day_data['total_evaluated'] += 1
+        
+        # Track by ticket type
+        if ticket_type == 'implementation':
+            day_data['implementation_ticket_count'] += 1
+        elif ticket_type == 'management':
+            day_data['management_company_ticket_count'] += 1
+        
+        # Check for skipped tickets
+        if comment == "empty_bot_answer" or "management_company_ticket" in comment or "empty_human_answer" in comment:
+            day_data['skipped_count'] += 1
+            return
+        
+        # Categorize quality
+        if quality == "copy_paste":
+            day_data['copy_paste_count'] += 1
+        elif quality == "low_quality":
+            day_data['low_quality_count'] += 1
+            day_data['low_quality_tickets'].append(ticket_id)
     
     def get_low_quality_tickets(self, date_range="2_weeks"):
         """Get all low quality tickets for the specified date range"""

@@ -219,13 +219,14 @@ def create_weekly_percentage_chart(df):
     return fig
 
 def create_summary_metrics(df):
-    """Create summary metrics for the entire 2-week period"""
+    """Create summary metrics for the entire period"""
     total_copy_paste = df['copy_paste_count'].sum()
     total_low_quality = df['low_quality_count'].sum()
     total_evaluated = df['total_evaluated'].sum()
     total_tickets = df['total_tickets'].sum()
     total_skipped = df['skipped_count'].sum()
     total_management = df['management_company_ticket_count'].sum()
+    total_implementation = df.get('implementation_ticket_count', 0).sum()  # New field
     
     # Calculate percentages
     copy_paste_pct = (total_copy_paste / total_evaluated * 100) if total_evaluated > 0 else 0
@@ -239,6 +240,7 @@ def create_summary_metrics(df):
         'total_tickets': total_tickets,
         'total_skipped': total_skipped,
         'total_management': total_management,
+        'total_implementation': total_implementation,
         'copy_paste_pct': copy_paste_pct,
         'low_quality_pct': low_quality_pct,
         'evaluation_rate': evaluation_rate
@@ -365,7 +367,17 @@ def main():
         st.metric(
             "Management Company Tickets",
             f"{metrics['total_management']:,}",
-            help="Management company tickets processed (with management_ticket_evaluation key)"
+            help="Management company tickets processed"
+        )
+    
+    # Additional row for implementation tickets
+    col7, col8, col9 = st.columns(3)
+    
+    with col7:
+        st.metric(
+            "Implementation Tickets",
+            f"{metrics['total_implementation']:,}",
+            help="Implementation tickets (post-August 15, 2025)"
         )
     
     # Pie charts for evaluation and copy-paste rates
@@ -375,12 +387,13 @@ def main():
         evaluated = metrics['total_evaluated']
         skipped = metrics['total_skipped']
         mgt_company = metrics['total_management']
-        other = metrics['total_tickets'] - (evaluated + skipped + mgt_company)
+        implementation = metrics['total_implementation']
+        other = metrics['total_tickets'] - (evaluated + skipped + mgt_company + implementation)
         fig_eval = go.Figure(data=[go.Pie(
-            labels=["Evaluated", "Management Company", "Missed", "Other"],
-            values=[evaluated, mgt_company, skipped, other],
+            labels=["Evaluated", "Management Company", "Missed", "Implementation", "Other"],
+            values=[evaluated, mgt_company, skipped, implementation, other],
             hole=0.4,
-            marker_colors=["#6BB643", "#2176A5", "#E4572E", "#D3D3D3"]
+            marker_colors=["#6BB643", "#2176A5", "#E4572E", "#FFD700", "#D3D3D3"]
         )])
         fig_eval.update_layout(title="% Ticket Outcomes", height=350)
         st.plotly_chart(fig_eval, use_container_width=True)
@@ -421,10 +434,10 @@ def main():
     display_df = display_df.sort_values('date')  # Sort chronologically
     display_df['Date'] = display_df['date'].dt.strftime('%Y-%m-%d')
     display_df = display_df[['Date', 'total_tickets', 'total_evaluated', 'copy_paste_count', 
-                           'low_quality_count', 'skipped_count', 'management_company_ticket_count']]
+                           'low_quality_count', 'skipped_count', 'management_company_ticket_count', 'implementation_ticket_count']]
     
     display_df.columns = ['Date', 'Total Tickets', 'Evaluated', 'Copy Paste', 
-                         'Low Quality', 'Skipped', 'Management Co.']
+                         'Low Quality', 'Skipped', 'Management Co.', 'Implementation']
     
     st.dataframe(display_df, use_container_width=True, hide_index=True)
     
