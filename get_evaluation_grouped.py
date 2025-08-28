@@ -3,8 +3,9 @@ from langsmith import Client
 import json
 import time
 from datetime import datetime, timedelta, timezone
+from config import get_api_key_standalone
 
-client = Client(api_key="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")
+client = Client(api_key=get_api_key_standalone())
 
 # Configuration matching van_zendesk_langsmith implementation
 project_name = "evaluators"
