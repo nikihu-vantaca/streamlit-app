@@ -301,12 +301,12 @@ def main():
         st.warning("No data found for the selected date range. Try syncing data first!")
         return
     
-    # Filter to only include data from July 2025 onwards
-    july_2025_start = pd.to_datetime('2025-07-01')
-    df = df[df['date'] >= july_2025_start].copy()
+    # Filter to only include data from August 4, 2025 onwards (when evaluation data actually starts)
+    august_2025_start = pd.to_datetime('2025-08-04')
+    df = df[df['date'] >= august_2025_start].copy()
     
     if df.empty:
-        st.warning("No data found from July 2025 onwards. Try syncing data first!")
+        st.warning("No data found from August 4, 2025 onwards. Try syncing data first!")
         return
     
     # Ensure data is sorted chronologically

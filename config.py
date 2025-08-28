@@ -1,11 +1,14 @@
 import os
-import streamlit as st
 
 def get_api_key():
     """Get API key from Streamlit secrets or environment variable"""
     try:
+        import streamlit as st
         # Try to get from Streamlit secrets first (matches your .streamlit/secrets.toml structure)
         return st.secrets["langsmith"]["api_key"]
+    except ImportError:
+        # Streamlit not available, fall back to environment variable
+        return os.getenv("LANGSMITH_API_KEY", "")
     except:
         # Fallback to environment variable
         return os.getenv("LANGSMITH_API_KEY", "")
