@@ -54,7 +54,15 @@ class TicketDatabase:
         """Fetch latest data from LangSmith and store in database"""
         try:
             client = Client(api_key=api_key)
-            runs = client.list_runs(project_name=project_name)
+            # Use a larger limit to get more historical data, but handle rate limiting
+            try:
+                runs = client.list_runs(project_name=project_name, limit=10000)
+            except Exception as e:
+                if "rate limit" in str(e).lower() or "429" in str(e):
+                    print("Rate limit hit, trying with smaller limit...")
+                    runs = client.list_runs(project_name=project_name, limit=2000)
+                else:
+                    raise e
             
             # Get the latest timestamp we have in our database
             latest_timestamp = self.get_latest_timestamp()
