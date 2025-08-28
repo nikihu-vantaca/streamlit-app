@@ -249,7 +249,7 @@ def create_summary_metrics(df):
 # Main app
 def main():
     try:
-        api_key = st.secrets["api_key"]
+        api_key = st.secrets["langsmith"]["api_key"]
     except KeyError:
         st.error("LangSmith API key not found in secrets. Please configure it in Streamlit Cloud.")
         st.stop()

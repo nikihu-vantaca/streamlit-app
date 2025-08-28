@@ -7,7 +7,11 @@ This Streamlit dashboard analyzes ticket evaluation data from LangSmith, support
 ### For Streamlit Cloud (Production)
 1. Go to your Streamlit Cloud dashboard
 2. Navigate to your app's settings
-3. Add a secret with key `api_key` and your LangSmith API key as the value
+3. Add a secret with the following structure:
+   ```toml
+   [langsmith]
+   api_key = "your_actual_api_key_here"
+   ```
 
 ### For Local Development
 1. Create a `.env` file in the project root
