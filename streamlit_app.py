@@ -14,6 +14,7 @@ import toml
 from langsmith import Client
 import json
 from collections import defaultdict
+import re
 
 # Page configuration
 st.set_page_config(
@@ -61,6 +62,64 @@ def get_api_key():
         return st.secrets["langsmith"]["api_key"]
     except:
         return None
+
+def is_valid_date(date_string):
+    """Check if a string is a valid date in YYYY-MM-DD format"""
+    if not date_string:
+        return False
+    
+    # Check if it matches the pattern YYYY-MM-DD
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_string):
+        return False
+    
+    try:
+        datetime.strptime(date_string, '%Y-%m-%d')
+        return True
+    except ValueError:
+        return False
+
+def fix_malformed_dates():
+    """Fix malformed dates in the database"""
+    conn = init_database()
+    cursor = conn.cursor()
+    
+    # Get all records with malformed dates
+    cursor.execute('SELECT id, date, experiment_name FROM ticket_evaluations')
+    records = cursor.fetchall()
+    
+    fixed_count = 0
+    for record_id, date, experiment_name in records:
+        if not is_valid_date(date):
+            # Try to extract proper date from experiment name
+            new_date = extract_date_from_experiment_name(experiment_name)
+            if new_date and is_valid_date(new_date):
+                cursor.execute('UPDATE ticket_evaluations SET date = ? WHERE id = ?', (new_date, record_id))
+                fixed_count += 1
+    
+    conn.commit()
+    conn.close()
+    
+    if fixed_count > 0:
+        st.success(f"✅ Fixed {fixed_count} malformed dates in the database!")
+
+def extract_date_from_experiment_name(experiment_name):
+    """Extract date from experiment name"""
+    if not experiment_name:
+        return None
+    
+    try:
+        # Try to extract date from experiment name
+        # Format: implementation-evaluation-2025-08-15-6e065ee8
+        parts = experiment_name.split('-')
+        if len(parts) >= 6:
+            year, month, day = parts[3:6]
+            # Validate the parts are actually numbers
+            if year.isdigit() and month.isdigit() and day.isdigit():
+                return f"{year}-{month}-{day}"
+    except:
+        pass
+    
+    return None
 
 def init_database():
     """Initialize database connection and create tables if needed"""
@@ -262,15 +321,10 @@ def categorize_quality(quality, comment):
 
 def extract_date_from_experiment(experiment, start_time):
     """Extract date from experiment name or use start time"""
-    try:
-        # Try to extract date from experiment name
-        # Format: implementation-evaluation-2025-08-15-6e065ee8
-        parts = experiment.split('-')
-        if len(parts) >= 6:
-            year, month, day = parts[3:6]
-            return f"{year}-{month}-{day}"
-    except:
-        pass
+    # First try to extract from experiment name
+    extracted_date = extract_date_from_experiment_name(experiment)
+    if extracted_date and is_valid_date(extracted_date):
+        return extracted_date
     
     # Fallback to start time
     if start_time:
@@ -285,7 +339,7 @@ def get_evaluation_data(start_date, end_date):
     query = '''
         SELECT date, ticket_type, quality, COUNT(*) as count
         FROM ticket_evaluations 
-        WHERE date >= ? AND date <= ?
+        WHERE date >= ? AND date <= ? AND date LIKE '____-__-__'
         GROUP BY date, ticket_type, quality
         ORDER BY date, ticket_type, quality
     '''
@@ -305,7 +359,7 @@ def get_evaluation_breakdown_by_type(start_date, end_date):
             quality,
             COUNT(*) as count
         FROM ticket_evaluations 
-        WHERE date >= ? AND date <= ?
+        WHERE date >= ? AND date <= ? AND date LIKE '____-__-__'
         GROUP BY ticket_type, quality
         ORDER BY ticket_type, quality
     '''
@@ -314,6 +368,23 @@ def get_evaluation_breakdown_by_type(start_date, end_date):
     conn.close()
     
     return df
+
+def get_available_dates():
+    """Get available dates from database (only valid dates)"""
+    conn = init_database()
+    cursor = conn.cursor()
+    
+    # Only get valid dates
+    cursor.execute('''
+        SELECT MIN(date), MAX(date) 
+        FROM ticket_evaluations 
+        WHERE date LIKE '____-__-__'
+    ''')
+    
+    min_date, max_date = cursor.fetchone()
+    conn.close()
+    
+    return min_date, max_date
 
 def create_quality_distribution_chart(df):
     """Create quality distribution chart"""
@@ -429,15 +500,18 @@ def main():
     # Sidebar
     st.sidebar.title("⚙️ Dashboard Controls")
     
+    # Fix malformed dates button
+    st.sidebar.subheader("🔧 Database Maintenance")
+    if st.sidebar.button("Fix Malformed Dates"):
+        with st.spinner("Fixing malformed dates..."):
+            fix_malformed_dates()
+            st.rerun()
+    
     # Date range selection
     st.sidebar.subheader("📅 Date Range")
     
-    # Get available dates from database
-    conn = init_database()
-    cursor = conn.cursor()
-    cursor.execute('SELECT MIN(date), MAX(date) FROM ticket_evaluations')
-    min_date, max_date = cursor.fetchone()
-    conn.close()
+    # Get available dates from database (only valid dates)
+    min_date, max_date = get_available_dates()
     
     if min_date and max_date:
         start_date = st.sidebar.date_input(
@@ -476,8 +550,13 @@ def main():
     total_records = cursor.fetchone()[0]
     st.sidebar.metric("Total Records", f"{total_records:,}")
     
+    # Valid records (with proper dates)
+    cursor.execute('SELECT COUNT(*) FROM ticket_evaluations WHERE date LIKE "____-__-__"')
+    valid_records = cursor.fetchone()[0]
+    st.sidebar.metric("Valid Records", f"{valid_records:,}")
+    
     # Records in selected range
-    cursor.execute('SELECT COUNT(*) FROM ticket_evaluations WHERE date >= ? AND date <= ?', 
+    cursor.execute('SELECT COUNT(*) FROM ticket_evaluations WHERE date >= ? AND date <= ? AND date LIKE "____-__-__"', 
                   [start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')])
     range_records = cursor.fetchone()[0]
     st.sidebar.metric("Records in Range", f"{range_records:,}")
@@ -600,12 +679,7 @@ def main():
         st.warning("⚠️ No data found for the selected date range.")
         
         # Show info about available data
-        conn = init_database()
-        cursor = conn.cursor()
-        cursor.execute('SELECT MIN(date), MAX(date) FROM ticket_evaluations')
-        min_date, max_date = cursor.fetchone()
-        conn.close()
-        
+        min_date, max_date = get_available_dates()
         if min_date and max_date:
             st.info(f"📅 Available data range: {min_date} to {max_date}")
     
