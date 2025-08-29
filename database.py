@@ -56,7 +56,7 @@ class TicketDatabase:
             client = Client(api_key=api_key)
             # Use a larger limit to get more historical data, but handle rate limiting
             try:
-                runs = client.list_runs(project_name=project_name, limit=10000)
+                runs = client.list_runs(project_name=project_name, limit=1000)
             except Exception as e:
                 if "rate limit" in str(e).lower() or "429" in str(e):
                     print("Rate limit hit, trying with smaller limit...")
