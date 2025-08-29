@@ -112,7 +112,9 @@ def extract_date_from_experiment_name(experiment_name):
         # Format: implementation-evaluation-2025-08-15-6e065ee8
         parts = experiment_name.split('-')
         if len(parts) >= 6:
-            year, month, day = parts[3:6]
+            # The format is: implementation-evaluation-2025-08-15-6e065ee8
+            # So parts[2] = "2025" (year), parts[3] = "08" (month), parts[4] = "15" (day)
+            year, month, day = parts[2], parts[3], parts[4]
             # Validate the parts are actually numbers
             if year.isdigit() and month.isdigit() and day.isdigit():
                 return f"{year}-{month}-{day}"
