@@ -1,54 +1,72 @@
-# Zendesk Support Agent Performance Dashboard
+# Ticket Evaluation Dashboard
 
-This Streamlit dashboard analyzes ticket evaluation data from LangSmith, supporting two different evaluation systems:
-
-## API Key Setup
-
-### For Streamlit Cloud (Production)
-1. Go to your Streamlit Cloud dashboard
-2. Navigate to your app's settings
-3. Add a secret with the following structure:
-   ```toml
-   [langsmith]
-   api_key = "your_actual_api_key_here"
-   ```
-
-### For Local Development
-1. Create a `.env` file in the project root
-2. Add your API key: `LANGSMITH_API_KEY=your_actual_api_key_here`
-3. Or set the environment variable: `export LANGSMITH_API_KEY=your_actual_api_key_here`
-
-### For Standalone Scripts
-The evaluation scripts (`get_evaluation_ungrouped.py` and `get_evaluation_grouped.py`) will automatically use the API key from:
-1. Environment variable `LANGSMITH_API_KEY`
-2. `.env` file (if present)
-
-## Evaluation Systems
-
-### Pre-August 15, 2025 (Ungrouped)
-- Uses `zendesk-evaluation-2025-XX-XX` experiments
-- Categorizes tickets as "homeowner" or "management" based on evaluation key
-- Management tickets are excluded from evaluation counts
-
-### Post-August 15, 2025 (Grouped)
-- Uses separate experiments:
-  - `implementation-evaluation-2025-XX-XX`
-  - `homeowner-pay-evaluation-2025-XX-XX`
-  - `management-pay-evaluation-2025-XX-XX`
-- All tickets count as evaluated
-- Tracks implementation tickets separately
-
-## Usage
-
-1. **Streamlit Dashboard**: Run `streamlit run streamlit_app.py`
-2. **Ungrouped Analysis**: Run `python get_evaluation_ungrouped.py`
-3. **Grouped Analysis**: Run `python get_evaluation_grouped.py`
+A comprehensive Streamlit dashboard for analyzing ticket evaluation data from LangSmith, with the same data structure and analysis capabilities as the `create_daily_breakdown_spreadsheet.py` script.
 
 ## Features
 
-- Real-time data syncing from LangSmith
-- SQLite database for data persistence
-- Interactive charts and metrics
-- Export functionality (CSV, JSON)
-- Date range filtering (2 weeks, 4 weeks, all data)
-- Separate tracking for different ticket types
+### 📈 Overview Dashboard Tab
+- **Key Metrics**: Total tickets, quality percentages, and performance indicators
+- **Interactive Charts**: Quality distribution over time, ticket type distribution
+- **Detailed Analysis**: Breakdown by ticket type with quality metrics
+- **Real-time Data**: Sync with LangSmith to get latest evaluation data
+
+### 📊 Daily Breakdown Analysis Tab
+- **Comprehensive Breakdown**: Same data structure as `create_daily_breakdown_spreadsheet.py`
+- **Interactive Visualizations**: Daily breakdown charts by ticket type and quality
+- **Data Export**: Download as CSV or complete Excel spreadsheet with multiple sheets
+- **Summary Statistics**: Overall metrics by ticket type and quality
+
+## Data Structure
+
+The dashboard provides the same detailed breakdown as the spreadsheet script:
+
+- **Daily Breakdown**: Date, ticket type, quality, count, percentages
+- **Summary Data**: Overall statistics by ticket type and quality
+- **Pivot Tables**: Analysis by date and type, date and quality
+
+## Installation
+
+1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+2. Configure LangSmith API key in `.streamlit/secrets.toml`:
+```toml
+[langsmith]
+api_key = "your_api_key_here"
+```
+
+3. Run the dashboard:
+```bash
+streamlit run streamlit_app.py
+```
+
+## Usage
+
+1. **Data Sync**: Use the sidebar to sync latest data from LangSmith
+2. **Date Range**: Select custom date ranges for analysis
+3. **Overview**: View high-level metrics and trends in the first tab
+4. **Detailed Analysis**: Access comprehensive breakdowns in the second tab
+5. **Export**: Download data as CSV or Excel files
+
+## Database
+
+The dashboard uses SQLite (`ticket_data.db`) to store evaluation data locally, with automatic date validation and cleanup functionality.
+
+## Requirements
+
+- Python 3.7+
+- Streamlit
+- Pandas
+- Plotly
+- LangSmith
+- OpenPyXL (for Excel export)
+
+## File Structure
+
+- `streamlit_app.py` - Main dashboard application
+- `create_daily_breakdown_spreadsheet.py` - Original spreadsheet script
+- `database.py` - Database utilities
+- `requirements.txt` - Python dependencies
+- `.streamlit/secrets.toml` - Configuration (create this file)

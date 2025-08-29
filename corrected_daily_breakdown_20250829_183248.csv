@@ -1,0 +1,70 @@
+Date,Ticket_Type,Quality,Count,Percentage_of_Type,Percentage_of_Total,Total_Type_Tickets,Total_Daily_Tickets
+2025-08-15,Implementation,Skipped,1,100.0,4.0,1,25
+2025-08-15,Homeowner,High Quality,5,100.0,20.0,5,25
+2025-08-15,Management,High Quality,19,100.0,76.0,19,25
+2025-08-15,TOTAL,ALL,25,100.0,100.0,25,25
+2025-08-16,Homeowner,Low Quality,1,100.0,50.0,1,2
+2025-08-16,Management,Skipped,1,100.0,50.0,1,2
+2025-08-16,TOTAL,ALL,2,100.0,100.0,2,2
+2025-08-18,Implementation,High Quality,2,8.7,3.0,23,67
+2025-08-18,Implementation,Skipped,21,91.3,31.3,23,67
+2025-08-18,Homeowner,High Quality,8,21.1,11.9,38,67
+2025-08-18,Homeowner,Low Quality,10,26.3,14.9,38,67
+2025-08-18,Homeowner,Skipped,4,10.5,6.0,38,67
+2025-08-18,Homeowner,Unknown,16,42.1,23.9,38,67
+2025-08-18,Management,Skipped,6,100.0,9.0,6,67
+2025-08-18,TOTAL,ALL,67,100.0,100.0,67,67
+2025-08-19,Implementation,High Quality,2,100.0,6.5,2,31
+2025-08-19,Homeowner,High Quality,7,28.0,22.6,25,31
+2025-08-19,Homeowner,Low Quality,14,56.0,45.2,25,31
+2025-08-19,Homeowner,Unknown,4,16.0,12.9,25,31
+2025-08-19,Management,High Quality,4,100.0,12.9,4,31
+2025-08-19,TOTAL,ALL,31,100.0,100.0,31,31
+2025-08-20,Implementation,High Quality,4,57.1,13.8,7,29
+2025-08-20,Implementation,Unknown,3,42.9,10.3,7,29
+2025-08-20,Homeowner,High Quality,5,45.5,17.2,11,29
+2025-08-20,Homeowner,Low Quality,3,27.3,10.3,11,29
+2025-08-20,Homeowner,Unknown,3,27.3,10.3,11,29
+2025-08-20,Management,High Quality,6,54.5,20.7,11,29
+2025-08-20,Management,Skipped,5,45.5,17.2,11,29
+2025-08-20,TOTAL,ALL,29,100.0,100.0,29,29
+2025-08-21,Implementation,High Quality,4,44.4,10.0,9,40
+2025-08-21,Implementation,Unknown,5,55.6,12.5,9,40
+2025-08-21,Homeowner,High Quality,5,20.8,12.5,24,40
+2025-08-21,Homeowner,Low Quality,10,41.7,25.0,24,40
+2025-08-21,Homeowner,Unknown,9,37.5,22.5,24,40
+2025-08-21,Management,High Quality,5,71.4,12.5,7,40
+2025-08-21,Management,Unknown,2,28.6,5.0,7,40
+2025-08-21,TOTAL,ALL,40,100.0,100.0,40,40
+2025-08-22,Implementation,High Quality,9,100.0,37.5,9,24
+2025-08-22,Homeowner,High Quality,7,58.3,29.2,12,24
+2025-08-22,Homeowner,Low Quality,5,41.7,20.8,12,24
+2025-08-22,Management,High Quality,2,66.7,8.3,3,24
+2025-08-22,Management,Skipped,1,33.3,4.2,3,24
+2025-08-22,TOTAL,ALL,24,100.0,100.0,24,24
+2025-08-25,Implementation,High Quality,12,100.0,40.0,12,30
+2025-08-25,Homeowner,High Quality,7,87.5,23.3,8,30
+2025-08-25,Homeowner,Unknown,1,12.5,3.3,8,30
+2025-08-25,Management,High Quality,10,100.0,33.3,10,30
+2025-08-25,TOTAL,ALL,30,100.0,100.0,30,30
+2025-08-26,Implementation,High Quality,8,100.0,33.3,8,24
+2025-08-26,Homeowner,High Quality,3,37.5,12.5,8,24
+2025-08-26,Homeowner,Skipped,2,25.0,8.3,8,24
+2025-08-26,Homeowner,Unknown,3,37.5,12.5,8,24
+2025-08-26,Management,High Quality,8,100.0,33.3,8,24
+2025-08-26,TOTAL,ALL,24,100.0,100.0,24,24
+2025-08-27,Implementation,High Quality,5,100.0,20.8,5,24
+2025-08-27,Homeowner,High Quality,11,100.0,45.8,11,24
+2025-08-27,Management,High Quality,6,75.0,25.0,8,24
+2025-08-27,Management,Skipped,2,25.0,8.3,8,24
+2025-08-27,TOTAL,ALL,24,100.0,100.0,24,24
+2025-08-28,Implementation,High Quality,7,63.6,17.9,11,39
+2025-08-28,Implementation,Skipped,2,18.2,5.1,11,39
+2025-08-28,Implementation,Unknown,2,18.2,5.1,11,39
+2025-08-28,Homeowner,High Quality,7,58.3,17.9,12,39
+2025-08-28,Homeowner,Low Quality,1,8.3,2.6,12,39
+2025-08-28,Homeowner,Unknown,4,33.3,10.3,12,39
+2025-08-28,Management,High Quality,5,31.2,12.8,16,39
+2025-08-28,Management,Skipped,8,50.0,20.5,16,39
+2025-08-28,Management,Unknown,3,18.8,7.7,16,39
+2025-08-28,TOTAL,ALL,39,100.0,100.0,39,39

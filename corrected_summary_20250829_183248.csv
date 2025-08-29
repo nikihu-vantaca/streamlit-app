@@ -1,0 +1,8 @@
+Summary_Type,Category,Total_Count,Percentage
+By_Ticket_Type,Homeowner,155,46.3
+By_Ticket_Type,Implementation,87,26.0
+By_Ticket_Type,Management,93,27.8
+By_Quality,High Quality,183,54.6
+By_Quality,Skipped,53,15.8
+By_Quality,Low Quality,44,13.1
+By_Quality,Unknown,55,16.4
