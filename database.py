@@ -51,18 +51,9 @@ class TicketDatabase:
         conn.close()
     
     def fetch_and_store_latest_data(self, api_key, project_name="evaluators"):
-        """Fetch latest data from LangSmith and store in database"""
+        """Fetch latest data from LangSmith and store in database with rate limiting"""
         try:
             client = Client(api_key=api_key)
-            # Use a larger limit to get more historical data, but handle rate limiting
-            try:
-                runs = client.list_runs(project_name=project_name, limit=1000)
-            except Exception as e:
-                if "rate limit" in str(e).lower() or "429" in str(e):
-                    print("Rate limit hit, trying with smaller limit...")
-                    runs = client.list_runs(project_name=project_name, limit=2000)
-                else:
-                    raise e
             
             # Get the latest timestamp we have in our database
             latest_timestamp = self.get_latest_timestamp()
@@ -70,59 +61,100 @@ class TicketDatabase:
             # Collect latest runs by (date, ticket_id)
             latest_runs = {}
             
-            for run in runs:
-                # Extract experiment name and date
-                experiment = None
-                if hasattr(run, "metadata") and run.metadata and isinstance(run.metadata, dict):
-                    experiment = run.metadata.get("experiment")
-                
-                if not experiment:
-                    continue
-                
-                # Determine date from experiment name
-                date_str = self.extract_date_from_experiment(experiment)
-                if not date_str:
-                    continue
-                
-                # Only process detailed_similarity_evaluator runs
-                if getattr(run, "name", None) == "detailed_similarity_evaluator" and getattr(run, "outputs", None):
-                    output = run.outputs
-                    if isinstance(output, dict):
-                        result = output
-                    elif isinstance(output, str):
-                        try:
-                            result = json.loads(output)
-                        except Exception:
+            # Use smaller batches with delays to avoid rate limits
+            batch_size = 100
+            total_processed = 0
+            max_batches = 20  # Limit total batches to avoid infinite loops
+            
+            print(f"🔄 Starting sync with rate limiting (batch size: {batch_size})...")
+            
+            for batch_num in range(max_batches):
+                try:
+                    print(f"📦 Processing batch {batch_num + 1}/{max_batches}...")
+                    
+                    # Fetch a small batch
+                    runs = client.list_runs(project_name=project_name, limit=batch_size)
+                    runs_list = list(runs)
+                    
+                    if not runs_list:
+                        print("✅ No more runs to process")
+                        break
+                    
+                    batch_processed = 0
+                    for run in runs_list:
+                        # Extract experiment name and date
+                        experiment = None
+                        if hasattr(run, "metadata") and run.metadata and isinstance(run.metadata, dict):
+                            experiment = run.metadata.get("experiment")
+                        
+                        if not experiment:
                             continue
+                        
+                        # Determine date from experiment name
+                        date_str = self.extract_date_from_experiment(experiment)
+                        if not date_str:
+                            continue
+                        
+                        # Only process detailed_similarity_evaluator runs
+                        if getattr(run, "name", None) == "detailed_similarity_evaluator" and getattr(run, "outputs", None):
+                            output = run.outputs
+                            if isinstance(output, dict):
+                                result = output
+                            elif isinstance(output, str):
+                                try:
+                                    result = json.loads(output)
+                                except Exception:
+                                    continue
+                            else:
+                                continue
+                            
+                            quality = result.get("quality")
+                            comment = result.get("comment")
+                            evaluation_key = result.get("key", "")
+                            
+                            # Extract ticket_id
+                            ticket_id = self.extract_ticket_id(run, result)
+                            if ticket_id is None:
+                                continue
+                            
+                            # Determine ticket type based on date and experiment
+                            ticket_type = self.determine_ticket_type(date_str, experiment, evaluation_key, comment)
+                            
+                            # Extract start_time
+                            start_time = getattr(run, "start_time", None)
+                            if isinstance(start_time, str):
+                                start_time_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+                            else:
+                                start_time_dt = start_time
+                            
+                            # Check if this run is newer than what we have
+                            if start_time_dt and latest_timestamp and start_time_dt <= latest_timestamp:
+                                continue
+                            
+                            key = (date_str, ticket_id)
+                            if ticket_id is not None and (key not in latest_runs or start_time_dt > latest_runs[key][0]):
+                                latest_runs[key] = (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time, ticket_type, evaluation_key)
+                                batch_processed += 1
+                    
+                    total_processed += len(runs_list)
+                    print(f"   Processed {len(runs_list)} runs, found {batch_processed} new evaluations")
+                    
+                    # Add delay between batches to avoid rate limits
+                    if batch_num < max_batches - 1:  # Don't delay after the last batch
+                        import time
+                        time.sleep(1)  # 1 second delay between batches
+                        
+                except Exception as e:
+                    if "rate limit" in str(e).lower() or "429" in str(e):
+                        print(f"⚠️ Rate limit hit in batch {batch_num + 1}, waiting 5 seconds...")
+                        import time
+                        time.sleep(5)
+                        continue
                     else:
-                        continue
-                    
-                    quality = result.get("quality")
-                    comment = result.get("comment")
-                    evaluation_key = result.get("key", "")
-                    
-                    # Extract ticket_id
-                    ticket_id = self.extract_ticket_id(run, result)
-                    if ticket_id is None:
-                        continue
-                    
-                    # Determine ticket type based on date and experiment
-                    ticket_type = self.determine_ticket_type(date_str, experiment, evaluation_key, comment)
-                    
-                    # Extract start_time
-                    start_time = getattr(run, "start_time", None)
-                    if isinstance(start_time, str):
-                        start_time_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-                    else:
-                        start_time_dt = start_time
-                    
-                    # Check if this run is newer than what we have
-                    if start_time_dt and latest_timestamp and start_time_dt <= latest_timestamp:
-                        continue
-                    
-                    key = (date_str, ticket_id)
-                    if ticket_id is not None and (key not in latest_runs or start_time_dt > latest_runs[key][0]):
-                        latest_runs[key] = (start_time_dt, date_str, ticket_id, quality, comment, experiment, start_time, ticket_type, evaluation_key)
+                        print(f"❌ Error in batch {batch_num + 1}: {e}")
+                        break
+            
+            print(f"✅ Sync completed. Processed {total_processed} total runs.")
             
             # Store new/updated data
             if latest_runs:
