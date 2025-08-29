@@ -505,5 +505,199 @@ def main():
         else:
             st.info("No low quality tickets found for this period.")
 
+    # Detailed Evaluation Analysis by Ticket Type
+    st.subheader("🔍 Detailed Evaluation Analysis by Ticket Type")
+    
+    # Get detailed evaluation data from database
+    def get_evaluation_breakdown_by_type():
+        """Get evaluation breakdown by ticket type"""
+        import sqlite3
+        conn = sqlite3.connect(db.db_path)
+        
+        # Get data for the selected date range
+        end_date = datetime.now()
+        if date_range_param == "2_weeks":
+            start_date = end_date - timedelta(days=14)
+        elif date_range_param == "4_weeks":
+            start_date = end_date - timedelta(days=28)
+        else:  # all_data
+            start_date = datetime(2025, 7, 1)
+        
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+        
+        query = '''
+            SELECT ticket_type, quality, comment, COUNT(*) as count
+            FROM ticket_evaluations 
+            WHERE date >= ? AND date <= ?
+            GROUP BY ticket_type, quality, comment
+        '''
+        
+        df_breakdown = pd.read_sql_query(query, conn, params=(start_date_str, end_date_str))
+        conn.close()
+        
+        return df_breakdown
+    
+    try:
+        breakdown_df = get_evaluation_breakdown_by_type()
+        
+        if not breakdown_df.empty:
+            # Calculate statistics by ticket type
+            ticket_type_stats = {}
+            
+            for ticket_type in breakdown_df['ticket_type'].unique():
+                type_data = breakdown_df[breakdown_df['ticket_type'] == ticket_type]
+                
+                total = type_data['count'].sum()
+                copy_paste = type_data[type_data['quality'] == 'copy_paste']['count'].sum()
+                low_quality = type_data[type_data['quality'] == 'low_quality']['count'].sum()
+                high_quality = type_data[type_data['quality'] == 'high_quality']['count'].sum()
+                skipped = type_data[type_data['comment'].isin(['empty_bot_answer', 'management_company_ticket', 'empty_human_answer'])]['count'].sum()
+                
+                ticket_type_stats[ticket_type] = {
+                    'total': total,
+                    'copy_paste': copy_paste,
+                    'low_quality': low_quality,
+                    'high_quality': high_quality,
+                    'skipped': skipped
+                }
+            
+            # Display results in columns
+            if ticket_type_stats:
+                col1, col2, col3 = st.columns(3)
+                
+                # Implementation tickets
+                if 'implementation' in ticket_type_stats:
+                    with col1:
+                        st.markdown("### 🛠️ Implementation Tickets")
+                        stats = ticket_type_stats['implementation']
+                        st.metric("Total", f"{stats['total']}")
+                        st.metric("Copy-paste", f"{stats['copy_paste']}", f"{stats['copy_paste']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("Low Quality", f"{stats['low_quality']}", f"{stats['low_quality']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("High Quality", f"{stats['high_quality']}", f"{stats['high_quality']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("Skipped", f"{stats['skipped']}", f"{stats['skipped']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                
+                # Homeowner tickets
+                if 'homeowner' in ticket_type_stats:
+                    with col2:
+                        st.markdown("### 🏠 Homeowner Tickets")
+                        stats = ticket_type_stats['homeowner']
+                        st.metric("Total", f"{stats['total']}")
+                        st.metric("Copy-paste", f"{stats['copy_paste']}", f"{stats['copy_paste']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("Low Quality", f"{stats['low_quality']}", f"{stats['low_quality']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("High Quality", f"{stats['high_quality']}", f"{stats['high_quality']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("Skipped", f"{stats['skipped']}", f"{stats['skipped']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                
+                # Management tickets
+                if 'management' in ticket_type_stats:
+                    with col3:
+                        st.markdown("### 🏢 Management Tickets")
+                        stats = ticket_type_stats['management']
+                        st.metric("Total", f"{stats['total']}")
+                        st.metric("Copy-paste", f"{stats['copy_paste']}", f"{stats['copy_paste']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("Low Quality", f"{stats['low_quality']}", f"{stats['low_quality']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("High Quality", f"{stats['high_quality']}", f"{stats['high_quality']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                        st.metric("Skipped", f"{stats['skipped']}", f"{stats['skipped']/stats['total']*100:.1f}%" if stats['total'] > 0 else "0%")
+                
+                # Overall summary
+                st.markdown("### 📊 Overall Summary")
+                
+                total_tickets = sum(stats['total'] for stats in ticket_type_stats.values())
+                total_copy_paste = sum(stats['copy_paste'] for stats in ticket_type_stats.values())
+                total_low_quality = sum(stats['low_quality'] for stats in ticket_type_stats.values())
+                total_skipped = sum(stats['skipped'] for stats in ticket_type_stats.values())
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Total Tickets", f"{total_tickets}")
+                with col2:
+                    st.metric("Copy-paste", f"{total_copy_paste}", f"{total_copy_paste/total_tickets*100:.1f}%" if total_tickets > 0 else "0%")
+                with col3:
+                    st.metric("Low Quality", f"{total_low_quality}", f"{total_low_quality/total_tickets*100:.1f}%" if total_tickets > 0 else "0%")
+                with col4:
+                    st.metric("Skipped", f"{total_skipped}", f"{total_skipped/total_tickets*100:.1f}%" if total_tickets > 0 else "0%")
+                
+                # Distribution by ticket type
+                st.markdown("### 📈 Distribution by Ticket Type")
+                distribution_data = []
+                for ticket_type, stats in ticket_type_stats.items():
+                    distribution_data.append({
+                        'Ticket Type': ticket_type.title(),
+                        'Count': stats['total'],
+                        'Percentage': f"{stats['total']/total_tickets*100:.1f}%" if total_tickets > 0 else "0%"
+                    })
+                
+                distribution_df = pd.DataFrame(distribution_data)
+                st.dataframe(distribution_df, use_container_width=True, hide_index=True)
+                
+                # Create visualization chart
+                st.markdown("### 📊 Evaluation Quality by Ticket Type")
+                
+                # Prepare data for the chart
+                chart_data = []
+                for ticket_type, stats in ticket_type_stats.items():
+                    if stats['total'] > 0:
+                        chart_data.append({
+                            'Ticket Type': ticket_type.title(),
+                            'Copy-paste': stats['copy_paste'],
+                            'Low Quality': stats['low_quality'],
+                            'High Quality': stats['high_quality'],
+                            'Skipped': stats['skipped']
+                        })
+                
+                if chart_data:
+                    chart_df = pd.DataFrame(chart_data)
+                    
+                    # Create stacked bar chart
+                    fig = go.Figure()
+                    
+                    colors = ['#FF6B6B', '#FFE66D', '#4ECDC4', '#95A5A6']  # Red, Yellow, Green, Gray
+                    
+                    fig.add_trace(go.Bar(
+                        x=chart_df['Ticket Type'],
+                        y=chart_df['Copy-paste'],
+                        name='Copy-paste',
+                        marker_color=colors[0]
+                    ))
+                    
+                    fig.add_trace(go.Bar(
+                        x=chart_df['Ticket Type'],
+                        y=chart_df['Low Quality'],
+                        name='Low Quality',
+                        marker_color=colors[1]
+                    ))
+                    
+                    fig.add_trace(go.Bar(
+                        x=chart_df['Ticket Type'],
+                        y=chart_df['High Quality'],
+                        name='High Quality',
+                        marker_color=colors[2]
+                    ))
+                    
+                    fig.add_trace(go.Bar(
+                        x=chart_df['Ticket Type'],
+                        y=chart_df['Skipped'],
+                        name='Skipped',
+                        marker_color=colors[3]
+                    ))
+                    
+                    fig.update_layout(
+                        title='Evaluation Quality Breakdown by Ticket Type',
+                        xaxis_title='Ticket Type',
+                        yaxis_title='Count',
+                        barmode='stack',
+                        height=500
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                
+        else:
+            st.info("No evaluation data found for the selected date range.")
+            
+    except Exception as e:
+        st.error(f"Error loading evaluation breakdown: {e}")
+        st.info("This feature requires evaluation data to be synced from LangSmith.")
+
 if __name__ == "__main__":
     main()
