@@ -432,7 +432,6 @@ def get_daily_breakdown_data(start_date=None, end_date=None):
         df = pd.read_sql_query(query, conn)
     
     conn.close()
-    
     return df
 
 def create_detailed_breakdown_spreadsheet(start_date=None, end_date=None):
