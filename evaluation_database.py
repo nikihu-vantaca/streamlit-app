@@ -334,10 +334,11 @@ class EvaluationDatabase:
                 ticket_type,
                 quality,
                 COUNT(*) as count,
-                AVG(score) as avg_score
+                AVG(score) as avg_score,
+                experiment_name
             FROM evaluations
             WHERE ticket_type IS NOT NULL AND quality IS NOT NULL
-            GROUP BY date, ticket_type, quality
+            GROUP BY date, ticket_type, quality, experiment_name
             ORDER BY date DESC, ticket_type, quality
         '''
         
