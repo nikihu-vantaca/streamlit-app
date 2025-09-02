@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import sqlite3
+import re
 from evaluation_database import EvaluationDatabase
 
 # Page configuration
@@ -224,7 +225,29 @@ def main():
         if not data['latest_experiments'].empty:
             # Format the data for display
             exp_display = data['latest_experiments'].copy()
-            exp_display['date'] = pd.to_datetime(exp_display['date']).dt.strftime('%Y-%m-%d')
+            
+            # Extract date from experiment_name instead of using database date
+            def extract_date_from_experiment_name(exp_name):
+                """Extract date from experiment name format: type-evaluation-YYYY-MM-DD-hash"""
+                try:
+                    # Look for YYYY-MM-DD pattern in the experiment name
+                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', exp_name)
+                    if date_match:
+                        return date_match.group(1)
+                    else:
+                        # Fallback to database date if no date found in name
+                        return None
+                except:
+                    return None
+            
+            # Apply date extraction to experiment names
+            exp_display['extracted_date'] = exp_display['experiment_name'].apply(extract_date_from_experiment_name)
+            
+            # Use extracted date if available, otherwise fall back to database date
+            exp_display['date'] = exp_display['extracted_date'].fillna(
+                pd.to_datetime(exp_display['date']).dt.strftime('%Y-%m-%d')
+            )
+            
             exp_display['updated_at'] = pd.to_datetime(exp_display['updated_at']).dt.strftime('%Y-%m-%d %H:%M')
             
             st.dataframe(
