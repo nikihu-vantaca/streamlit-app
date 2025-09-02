@@ -110,6 +110,9 @@ class EvaluationDatabase:
             evaluation_data = []
             experiment_data = []
             
+            # Track experiments by date to only keep the last set of three
+            experiments_by_date = {}
+            
             for run in runs:
                 if run.name == "detailed_similarity_evaluator" and run.outputs:
                     # Extract evaluation data
@@ -120,19 +123,60 @@ class EvaluationDatabase:
                     # Extract experiment data
                     exp_data = self._extract_experiment_data(run)
                     if exp_data:
-                        experiment_data.append(exp_data)
+                        # Group experiments by date
+                        date = exp_data['date']
+                        if date not in experiments_by_date:
+                            experiments_by_date[date] = []
+                        experiments_by_date[date].append(exp_data)
                 
                 # Rate limiting
                 time.sleep(0.1)
+            
+            # For each date, only keep the last set of three experiments (management-pay, homeowner-pay, implementation)
+            for date, experiments in experiments_by_date.items():
+                # Sort experiments by start time (most recent first)
+                experiments.sort(key=lambda x: x['start_time'], reverse=True)
+                
+                # Keep only the most recent set of three experiments
+                # Look for experiments starting with the expected prefixes
+                kept_experiments = []
+                seen_prefixes = set()
+                
+                for exp in experiments:
+                    exp_name = exp['experiment_name']
+                    prefix = None
+                    
+                    if exp_name.startswith('management-pay'):
+                        prefix = 'management-pay'
+                    elif exp_name.startswith('homeowner-pay'):
+                        prefix = 'homeowner-pay'
+                    elif exp_name.startswith('implementation'):
+                        prefix = 'implementation'
+                    
+                    if prefix and prefix not in seen_prefixes:
+                        seen_prefixes.add(prefix)
+                        kept_experiments.append(exp)
+                    
+                    # Stop once we have all three
+                    if len(kept_experiments) >= 3:
+                        break
+                
+                # Replace the experiments list with only the kept ones
+                experiments_by_date[date] = kept_experiments
+            
+            # Flatten the kept experiments
+            final_experiments = []
+            for experiments in experiments_by_date.values():
+                final_experiments.extend(experiments)
             
             # Store data in database
             if evaluation_data:
                 self._store_evaluations(evaluation_data)
             
-            if experiment_data:
-                self._store_experiments(experiment_data)
+            if final_experiments:
+                self._store_experiments(final_experiments)
             
-            print(f"Successfully processed {len(evaluation_data)} evaluations and {len(experiment_data)} experiments")
+            print(f"Successfully processed {len(evaluation_data)} evaluations and {len(final_experiments)} experiments")
             return True
             
         except Exception as e:
@@ -169,6 +213,9 @@ class EvaluationDatabase:
             if isinstance(outputs, dict):
                 if 'quality' in outputs:
                     quality = outputs['quality']
+                    # Standardize quality naming
+                    if quality == 'copy_paste':
+                        quality = 'high_quality'
                 if 'comment' in outputs:
                     comment = outputs['comment']
                 if 'score' in outputs:
