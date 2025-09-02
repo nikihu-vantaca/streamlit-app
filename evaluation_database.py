@@ -113,6 +113,9 @@ class EvaluationDatabase:
             # Track experiments by date to only keep the last set of three
             experiments_by_date = {}
             
+            # Track run counts for each experiment name
+            experiment_run_counts = {}
+            
             for run in runs:
                 if run.name == "detailed_similarity_evaluator" and run.outputs:
                     # Extract evaluation data
@@ -123,6 +126,12 @@ class EvaluationDatabase:
                     # Extract experiment data
                     exp_data = self._extract_experiment_data(run)
                     if exp_data:
+                        # Count runs for this experiment
+                        exp_name = exp_data['experiment_name']
+                        if exp_name not in experiment_run_counts:
+                            experiment_run_counts[exp_name] = 0
+                        experiment_run_counts[exp_name] += 1
+                        
                         # Group experiments by date
                         date = exp_data['date']
                         if date not in experiments_by_date:
@@ -155,6 +164,8 @@ class EvaluationDatabase:
                     
                     if prefix and prefix not in seen_prefixes:
                         seen_prefixes.add(prefix)
+                        # Update the run count with the actual count
+                        exp['run_count'] = experiment_run_counts.get(exp_name, 1)
                         kept_experiments.append(exp)
                     
                     # Stop once we have all three
@@ -280,7 +291,7 @@ class EvaluationDatabase:
                 'experiment_type': experiment_type,
                 'experiment_name': experiment_name,
                 'start_time': run.start_time.isoformat() if run.start_time else None,
-                'run_count': 1
+                'run_count': 0  # Will be updated later with actual count
             }
             
         except Exception as e:
