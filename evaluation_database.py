@@ -226,6 +226,10 @@ class EvaluationDatabase:
             if hasattr(run, 'metadata') and run.metadata:
                 experiment_name = run.metadata.get('experiment')
             
+            # Skip zendesk evaluations
+            if experiment_name and experiment_name.startswith('zendesk'):
+                return None
+            
             # Get date from start time
             date = run.start_time.strftime('%Y-%m-%d') if run.start_time else None
             
@@ -256,11 +260,13 @@ class EvaluationDatabase:
             if not experiment_name:
                 return None
             
+            # Skip zendesk experiments
+            if experiment_name.startswith('zendesk'):
+                return None
+            
             # Determine experiment type from name
             experiment_type = None
-            if 'zendesk' in experiment_name:
-                experiment_type = 'zendesk'
-            elif 'implementation' in experiment_name:
+            if 'implementation' in experiment_name:
                 experiment_type = 'implementation'
             elif 'homeowner' in experiment_name:
                 experiment_type = 'homeowner'
