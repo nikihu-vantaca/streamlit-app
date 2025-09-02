@@ -327,9 +327,9 @@ class EvaluationDatabase:
                 date,
                 ticket_type,
                 COUNT(*) as total_evaluations,
-                SUM(CASE WHEN quality = 'good' THEN 1 ELSE 0 END) as good_count,
-                SUM(CASE WHEN quality = 'bad' THEN 1 ELSE 0 END) as bad_count,
-                SUM(CASE WHEN quality = 'ugly' THEN 1 ELSE 0 END) as ugly_count,
+                SUM(CASE WHEN quality = 'high_quality' THEN 1 ELSE 0 END) as good_count,
+                SUM(CASE WHEN quality = 'low_quality' THEN 1 ELSE 0 END) as bad_count,
+                SUM(CASE WHEN quality IN ('skipped', 'unknown') THEN 1 ELSE 0 END) as ugly_count,
                 AVG(score) as avg_score
             FROM evaluations
             WHERE date BETWEEN ? AND ?
@@ -361,6 +361,17 @@ class EvaluationDatabase:
         conn.close()
         
         return df
+    
+    def get_latest_date(self) -> Optional[str]:
+        """Get the latest date from the database"""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT MAX(date) FROM evaluations WHERE date IS NOT NULL')
+            result = cursor.fetchone()
+            return result[0] if result and result[0] else None
+        finally:
+            conn.close()
     
     def get_ticket_type_distribution(self) -> pd.DataFrame:
         """Get ticket type distribution"""

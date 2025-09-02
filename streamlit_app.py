@@ -90,7 +90,8 @@ def main():
         max_value=datetime.now()
     )
     
-    if len(date_range) == 2:
+    # Handle date range selection
+    if isinstance(date_range, tuple) and len(date_range) == 2:
         start_date, end_date = date_range
         start_date_str = start_date.strftime('%Y-%m-%d')
         end_date_str = end_date.strftime('%Y-%m-%d')
@@ -268,7 +269,18 @@ def main():
         st.sidebar.success("✅ API Key Found")
         if st.sidebar.button("Fetch New Data from LangSmith"):
             with st.spinner("Fetching data from LangSmith..."):
-                success = db.fetch_and_sync_data(api_key, start_date_str, end_date_str)
+                # Get the latest date from the database to fetch only newer data
+                latest_date = db.get_latest_date()
+                if latest_date:
+                    # Start fetching from the day after the latest data
+                    fetch_start_date = (pd.to_datetime(latest_date) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+                    fetch_end_date = datetime.now().strftime('%Y-%m-%d')
+                    st.info(f"Fetching data from {fetch_start_date} to {fetch_end_date}")
+                    success = db.fetch_and_sync_data(api_key, fetch_start_date, fetch_end_date)
+                else:
+                    # Fallback to last 30 days if no data exists
+                    success = db.fetch_and_sync_data(api_key, start_date_str, end_date_str)
+                
                 if success:
                     st.success("Data fetched successfully!")
                     st.cache_data.clear()
