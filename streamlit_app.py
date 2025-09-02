@@ -56,6 +56,13 @@ def load_data():
         ticket_type_distribution = db.get_ticket_type_distribution()
         latest_experiments = db.get_latest_experiments_info()
         
+        # Filter out zendesk experiments and evaluations from display
+        if not latest_experiments.empty:
+            latest_experiments = latest_experiments[~latest_experiments['experiment_name'].str.startswith('zendesk', na=False)]
+        
+        if not evaluation_summary.empty:
+            evaluation_summary = evaluation_summary[~evaluation_summary['experiment_name'].str.startswith('zendesk', na=False)]
+        
         return {
             'evaluation_summary': evaluation_summary,
             'daily_breakdown': daily_breakdown,
